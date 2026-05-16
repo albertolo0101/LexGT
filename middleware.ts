@@ -24,7 +24,13 @@ export async function middleware(request: NextRequest) {
   )
 
   // Refreshes the session cookie on every request
-  await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (request.nextUrl.pathname.startsWith('/admin')) {
+    if (!user || user.user_metadata?.role !== 'admin') {
+      return NextResponse.redirect(new URL('/', request.url))
+    }
+  }
 
   return supabaseResponse
 }

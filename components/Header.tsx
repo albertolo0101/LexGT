@@ -1,10 +1,14 @@
 import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { getUserTier } from '@/lib/get-user-tier'
 import Link from 'next/link'
 import { signOut } from '@/app/auth/actions'
 
 export default async function Header() {
   const supabase = await createServerSupabaseClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const [{ data: { user } }, tier] = await Promise.all([
+    supabase.auth.getUser(),
+    getUserTier(supabase),
+  ])
 
   return (
     <header className="border-b border-gray-100 bg-white">
@@ -17,6 +21,15 @@ export default async function Header() {
         </Link>
 
         <div className="flex items-center gap-5">
+          {user && tier === 'pro' && (
+            <Link
+              href="/casos"
+              className="text-xs text-gray-500 hover:text-gray-900 transition-colors"
+            >
+              Mis casos
+            </Link>
+          )}
+
           {user ? (
             <>
               <span className="text-xs text-gray-400 hidden sm:block truncate max-w-[200px]">

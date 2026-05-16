@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import type { Annotation, Law, Section, ArticleWithParagraphs } from "@/lib/types";
 import ParagraphHighlighter from "@/components/ParagraphHighlighter";
+import { getUserTier } from "@/lib/get-user-tier";
 
 type Props = { params: Promise<{ slug: string; section_id: string }> };
 
@@ -35,6 +36,7 @@ export default async function SectionReadingPage({ params }: Props) {
     { data: sectionRow },
     { data: articlesRaw, error: articlesError },
     { data: { user } },
+    tier,
   ] = await Promise.all([
     supabase.from("laws").select("*").eq("slug", slug).single(),
     supabase.from("sections").select("*").eq("id", section_id).single(),
@@ -45,6 +47,7 @@ export default async function SectionReadingPage({ params }: Props) {
       .eq("is_current", true)
       .order("position"),
     supabase.auth.getUser(),
+    getUserTier(supabase),
   ]);
 
   const law = lawRow as Law | null;
@@ -139,6 +142,7 @@ export default async function SectionReadingPage({ params }: Props) {
                         paragraphId={para.id}
                         articleId={article.id}
                         isAuthenticated={!!user}
+                        tier={tier}
                       />
                     </p>
                   ))}

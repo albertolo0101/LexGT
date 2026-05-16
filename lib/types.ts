@@ -51,11 +51,54 @@ export type Annotation = {
   user_id: string
   paragraph_id: string
   article_id: string
-  color: string
+  color: 'yellow' | 'green' | 'blue' | 'pink'
   char_start: number
   char_end: number
   note: string | null
   is_pinned_to_old_version: boolean
   created_at: string
   updated_at: string
+}
+
+export type LawReform = {
+  id: string
+  law_id: string
+  title: string
+  description: string | null
+  published_at: string
+  created_at: string
+}
+
+export type ReformNotification = {
+  id: string
+  user_id: string
+  reform_id: string
+  seen_at: string | null
+}
+
+export type Tier = 'free' | 'pro'
+
+export type UserProfile = {
+  user_id: string
+  tier: Tier
+  tier_expires_at: string | null
+  tier_source: string
+  created_at: string
+}
+
+export type Case = {
+  id: string
+  user_id: string
+  title: string
+  description: string | null
+  color: string
+  created_at: string
+  updated_at: string
+}
+
+export type CaseAnnotation = {
+  id: string
+  case_id: string
+  annotation_id: string
+  created_at: string
 }

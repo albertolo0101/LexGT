@@ -1,22 +1,93 @@
-import { createServerSupabaseClient } from "@/lib/supabase-server";
-import Link from "next/link";
-import type { Metadata } from "next";
-import type { Law } from "@/lib/types";
+import { createServerSupabaseClient } from "@/lib/supabase-server"
+import type { Metadata } from "next"
+import type { Law, LawReform } from "@/lib/types"
+import { getUserTier } from "@/lib/get-user-tier"
+import LawCard from "@/components/LawCard"
 
 export const metadata: Metadata = {
   title: "Leyes — LexGT",
   description: "Legislación de Guatemala",
-};
+}
+
+type UserTier = "anonymous" | "free" | "pro"
+
+function cutoffDate(tier: UserTier): string {
+  const d = new Date()
+  if (tier === "anonymous") d.setDate(d.getDate() - 7)
+  else if (tier === "free") d.setMonth(d.getMonth() - 1)
+  else d.setMonth(d.getMonth() - 6)
+  return d.toISOString()
+}
 
 export default async function LeyesPage() {
-  const supabase = await createServerSupabaseClient();
-  const { data: laws, error } = await supabase
-    .from("laws")
-    .select("*")
-    .eq("is_active", true)
-    .order("short_name");
+  const supabase = await createServerSupabaseClient()
+  const [{ data: { user } }, dbTier] = await Promise.all([
+    supabase.auth.getUser(),
+    getUserTier(supabase),
+  ])
+  const tier: UserTier = user ? dbTier : "anonymous"
 
-  if (error) throw new Error(error.message);
+  // Round 1: laws, reforms, and (if authed) seen ids + annotated article ids — all parallel
+  const [{ data: laws, error: lawsError }, { data: reforms }, seenReformIds, annotatedArticleIds] =
+    await Promise.all([
+      supabase.from("laws").select("*").eq("is_active", true).order("short_name"),
+      supabase.from("law_reforms").select("*").gte("published_at", cutoffDate(tier)),
+      user
+        ? supabase
+            .from("reform_notifications")
+            .select("reform_id")
+            .eq("user_id", user.id)
+            .then(({ data }) => new Set((data ?? []).map((r) => r.reform_id as string)))
+        : Promise.resolve(new Set<string>()),
+      user
+        ? supabase
+            .from("annotations")
+            .select("article_id")
+            .eq("user_id", user.id)
+            .then(({ data }) => new Set((data ?? []).map((a) => a.article_id as string)))
+        : Promise.resolve(new Set<string>()),
+    ])
+
+  if (lawsError) throw new Error(lawsError.message)
+
+  const reformsByLaw = new Map<string, LawReform[]>()
+  for (const reform of reforms ?? []) {
+    if (!seenReformIds.has(reform.id)) {
+      const arr = reformsByLaw.get(reform.law_id) ?? []
+      arr.push(reform as LawReform)
+      reformsByLaw.set(reform.law_id, arr)
+    }
+  }
+
+  const allPendingReformIds = [...reformsByLaw.values()].flat().map((r) => r.id)
+
+  // Round 2: find old articles with user annotations + new article versions — parallel
+  let articlePairsByReform: Record<string, { oldArticleId: string; newArticleId: string }[]> = {}
+
+  if (user && annotatedArticleIds.size && allPendingReformIds.length) {
+    const [{ data: oldArticleData }, { data: newArticleData }] = await Promise.all([
+      supabase
+        .from("articles")
+        .select("id, law_id")
+        .in("id", [...annotatedArticleIds])
+        .eq("is_current", false),
+      supabase
+        .from("articles")
+        .select("id, previous_version_id, reform_id")
+        .in("reform_id", allPendingReformIds)
+        .not("previous_version_id", "is", null),
+    ])
+
+    const oldArticleIdSet = new Set((oldArticleData ?? []).map((a) => a.id))
+
+    for (const art of newArticleData ?? []) {
+      if (art.previous_version_id && oldArticleIdSet.has(art.previous_version_id)) {
+        const pairs = articlePairsByReform[art.reform_id] ?? []
+        pairs.push({ oldArticleId: art.previous_version_id, newArticleId: art.id })
+        articlePairsByReform[art.reform_id] = pairs
+      }
+    }
+  }
 
   return (
     <div className="min-h-screen bg-white">
@@ -27,28 +98,16 @@ export default async function LeyesPage() {
 
         <div className="divide-y divide-gray-100">
           {(laws as Law[]).map((law) => (
-            <Link
+            <LawCard
               key={law.id}
-              href={`/leyes/${law.slug}`}
-              className="group flex items-start justify-between gap-6 py-5 -mx-2 px-2 rounded hover:bg-gray-50 transition-colors"
-            >
-              <div className="min-w-0">
-                <p className="text-base font-medium text-gray-900 group-hover:text-blue-700 transition-colors leading-snug">
-                  {law.short_name}
-                </p>
-                <p className="text-sm text-gray-500 mt-0.5 leading-snug">
-                  {law.full_name}
-                </p>
-              </div>
-              {law.decree && (
-                <span className="shrink-0 mt-0.5 text-xs text-gray-400 font-mono whitespace-nowrap">
-                  {law.decree}
-                </span>
-              )}
-            </Link>
+              law={law}
+              pendingReforms={reformsByLaw.get(law.id) ?? []}
+              userTier={tier}
+              articlePairsByReform={articlePairsByReform}
+            />
           ))}
         </div>
       </main>
     </div>
-  );
+  )
 }
