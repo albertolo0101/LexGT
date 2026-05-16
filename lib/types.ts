@@ -102,3 +102,19 @@ export type CaseAnnotation = {
   annotation_id: string
   created_at: string
 }
+
+export type LawCollection = {
+  id: number
+  slug: string
+  name: string
+  description: string | null
+  position: number
+  is_default: boolean
+}
+
+export type LawCollectionItem = {
+  id: number
+  collection_id: number
+  law_id: string  // uuid — references laws.id
+  position: number
+}

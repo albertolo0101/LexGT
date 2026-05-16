@@ -118,7 +118,7 @@ export default async function SectionReadingPage({ params }: Props) {
         ) : (
           <div className="space-y-10">
             {articles.map((article) => (
-              <article key={article.id} id={`art-${article.number}`}>
+              <article key={article.id} id={`articulo-${article.number}`}>
                 <header className="mb-3">
                   <h2 className="text-sm font-semibold text-gray-900">
                     <span className="text-gray-400 font-normal mr-2">

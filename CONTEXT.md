@@ -1,6 +1,6 @@
 # LexGT — Contexto del proyecto
 
-Última actualización: 2026-05-16 (Phase 8 completa)
+Última actualización: 2026-05-16 (Phase 9 completa)
 
 ---
 
@@ -50,7 +50,7 @@
 | Decretos | 1,200+ |
 | Jurisprudencias (CC + CSJ) | 3,500+ |
 
-Actualmente solo hay seed del **Código Civil** (Decreto Ley 106). El schema soporta múltiples leyes.
+Actualmente hay seed del **Código Civil** (Decreto Ley 106) y seed de prueba del **Código de Trabajo** (Decreto 1441). El schema soporta múltiples leyes.
 
 ---
 
@@ -70,15 +70,17 @@ Las credenciales están en `.env.local` (no commiteado, en gitignore).
 | `0004_user_profiles.sql` | Tabla user_profiles, trigger on_auth_user_created, función admin_find_user_by_email |
 | `0005_annotations_color_note.sql` | Idempotent: `color NOT NULL DEFAULT 'yellow'`, `note nullable` (ya existían en 0001; migration de tracking) |
 | `0006_cases.sql` | Tablas `cases` y `case_annotations` (many-to-many) con RLS owner; cascade en ambas FKs |
+| `0007_search.sql` | `search_vector tsvector` en `articles` y `paragraphs`; triggers + funciones de actualización; índices GIN; backfill de filas existentes |
+| `0008_collections.sql` | Tablas `law_collections` y `law_collection_items`; RLS público/admin; seed de 7 colecciones + 4 items (codigo-civil y codigo-trabajo). `law_id` es uuid (no integer). |
 
 ### Tablas activas
 
 | Tabla | Notas |
 |---|---|
-| `laws` | 1 fila: Código Civil (slug: `codigo-civil`) |
+| `laws` | 2 filas: Código Civil (slug: `codigo-civil`) + Código de Trabajo (slug: `codigo-trabajo`, seed de prueba) |
 | `sections` | Jerarquía: libro → titulo → capitulo. `kind` en español. |
-| `articles` | 1,996+ filas. Columnas de versioning: `version_number`, `superseded_at`, `previous_version_id`, `reform_id`. `is_current=false` en versiones antiguas. |
-| `paragraphs` | Texto por artículo, ordenado por `position` |
+| `articles` | 1,996+ filas. Columnas de versioning: `version_number`, `superseded_at`, `previous_version_id`, `reform_id`. `is_current=false` en versiones antiguas. Columna `search_vector tsvector` (migration 0007). |
+| `paragraphs` | Texto por artículo, ordenado por `position`. Columna `search_vector tsvector` (migration 0007). |
 | `annotations` | Solo el dueño puede leer/escribir. `is_pinned_to_old_version` para annotations migradas. |
 | `law_reforms` | Reformas publicadas y borradores. `status`: `'draft'` | `'published'`. `published_at` nullable (null en drafts). |
 | `reform_notifications` | Reformas ya vistas por el usuario. RLS owner-only SELECT + INSERT. |
@@ -91,6 +93,8 @@ Las credenciales están en `.env.local` (no commiteado, en gitignore).
 |---|---|
 | `cases` | Carpetas Pro. `color` string preset (gray/blue/green/red/amber/purple). RLS owner all. |
 | `case_annotations` | Many-to-many. `unique(case_id, annotation_id)`. FK cascade en ambas. RLS via join a cases. |
+| `law_collections` | id serial, slug único, name, description, position, is_default. RLS: SELECT público, escritura admin. 7 colecciones seeded. |
+| `law_collection_items` | id serial, collection_id → law_collections, law_id (uuid) → laws, position. UNIQUE(collection_id, law_id). RLS: SELECT público, escritura admin. |
 
 ### Tablas pendientes de migrar
 
@@ -111,6 +115,8 @@ saved_jurisprudences: id, user_id, source ('CC'|'CSJ'), external_id, title, full
 | `reform_notifications` | SELECT + INSERT solo owner |
 | `reform_draft_articles` | CRUD solo admin |
 | `user_profiles` | SELECT + UPDATE owner; INSERT + UPDATE admin |
+| `law_collections` | SELECT público; INSERT/UPDATE/DELETE solo admin |
+| `law_collection_items` | SELECT público; INSERT/UPDATE/DELETE solo admin |
 
 ### Funciones PostgreSQL
 
@@ -118,9 +124,11 @@ saved_jurisprudences: id, user_id, source ('CC'|'CSJ'), external_id, title, full
 - `public.handle_new_user()` — trigger `security definer` que crea fila en `user_profiles` al registrarse.
 - `public.admin_find_user_by_email(email)` — `security definer`, verifica admin, retorna `uuid` del usuario. Permite al panel admin buscar usuarios sin service role key.
 
-### Seed de prueba
+### Seeds de prueba
 
 `supabase/seeds/test_reform.sql` — inserta una reforma ficticia sobre el Artículo 1 del Código Civil: clona la versión 1 en versión 2 con texto modificado y la marca como superseded. Útil para probar la UI de reformas.
+
+`supabase/seeds/codigo_trabajo.sql` — **Código de Trabajo (Decreto 1441)** con estructura real y texto placeholder. Incluye: 1 ley, Libro I completo (Título I sin capítulos, Título II con 2 capítulos, Título III con 2 capítulos), 20 artículos con párrafos. Valida: /leyes con múltiples leyes, árbol de secciones de /leyes/codigo-trabajo, búsqueda full-text con palabras clave (trabajador, patrono, contrato). El contenido real se cargará en Phase 11. UUIDs: ley=`b000...0002`, secciones=`b100...000X`, artículos=`b200...000X`, párrafos=`b300...000X`.
 
 ---
 
@@ -184,6 +192,11 @@ app/
   page.tsx                              → redirect a /leyes
   layout.tsx                            → root layout con <Header /> global
   globals.css
+  buscar/
+    page.tsx                            → búsqueda full-text (server component); lee ?q= y ?law=; consulta articles + paragraphs via search_vector
+  api/
+    search/
+      route.ts                          → GET /api/search?q=&law=&limit= — endpoint público de búsqueda full-text; response: { results, total, query }
   leyes/
     page.tsx                            → lista de leyes + badges de reformas pendientes (server component)
     actions.ts                          → saveAnnotation (color + note + Pro validation),
@@ -216,7 +229,8 @@ app/
         page.tsx                        → revisión de borrador + botón publicar (server component)
 
 components/
-  Header.tsx                            → header global con estado de auth (server component)
+  Header.tsx                            → header global con estado de auth (server component); incluye <SearchBar /> en el centro
+  SearchBar.tsx                         → client component: form de búsqueda → /buscar?q=...; mobile: ícono lupa que expande
   ParagraphHighlighter.tsx              → client component: selección de texto, tooltip, highlights
   LawCard.tsx                           → client component: card de ley con badge de reformas + modal
   ReformModal.tsx                       → client component: modal de reforma con IntersectionObserver
@@ -227,7 +241,8 @@ lib/
   get-user-tier.ts                      → getUserTier(supabase): Promise<Tier> — server-only
   types.ts                              → Law, Section, Article, Paragraph, ArticleWithParagraphs,
                                           SectionNode, Annotation, LawReform, ReformNotification,
-                                          Tier, UserProfile, Case, CaseAnnotation
+                                          Tier, UserProfile, Case, CaseAnnotation,
+                                          LawCollection, LawCollectionItem
 
 middleware.ts                           → refresca cookie de sesión; protege /admin/* redirigiendo a /
 
@@ -240,6 +255,7 @@ supabase/
     0005_annotations_color_note.sql     → idempotent tracking: color + note en annotations
   seed.sql                              → Código Civil completo (aplicado en prod)
   seeds/test_reform.sql                 → reforma ficticia sobre Artículo 1 para pruebas
+  seeds/codigo_trabajo.sql              → Código de Trabajo (Decreto 1441): 1 ley + Libro I + 20 artículos placeholder
 ```
 
 ---
@@ -273,6 +289,12 @@ Server Component con guard Pro. Lista casos del usuario ordenados por `updated_a
 ### `/casos/[id]`
 Server Component. Detalle del caso: título, descripción, lista de highlights via join `case_annotations → annotations → paragraphs + articles`. Muestra excerpt resaltado con el color correcto, nota si existe, artículo de referencia. Botones vía form actions: "Eliminar del caso" llama `removeAnnotationFromCase(caId)`, "Eliminar caso" llama `deleteCase(id)` que redirecta a `/casos`.
 
+### `/buscar`
+Server Component. Lee `?q=` y `?law=` de searchParams. Si `q` tiene menos de 2 chars: pantalla vacía con instrucciones. Con `q` válido: ejecuta búsqueda full-text en paralelo sobre `articles.search_vector` y `paragraphs.search_vector` usando `plainto_tsquery('spanish', q)`, desduplicando por `article_id`. Lista resultados con número de artículo, heading, snippet (primeros párrafos) y nombre de ley. Click → `/leyes/[slug]/[section_id]#articulo-[number]`. Muestra total de resultados.
+
+### `GET /api/search`
+Route Handler público (no requiere auth). Params: `q` (req, min 2 chars), `law` (slug, opcional), `limit` (default 20, max 50). Busca en articles y paragraphs por `search_vector`. Retorna `{ results, total, query }`. Útil para llamadas AJAX futuras desde Client Components.
+
 ---
 
 ## Middleware
@@ -304,10 +326,19 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<publishable key>
 - ✓ Phase 6.5: Panel admin (crear/revisar/publicar reformas)
 - ✓ Phase 7: Pro tier — S1 (user_profiles + getUserTier + admin tier management) + S2 (multi-color highlights + notes)
 - ✓ Phase 8: Casos (Pro) — cases + case_annotations, /casos CRUD, "Guardar en caso" en highlights
-- [ ] Phase 9: Jurisprudencias (scraping + panel integrado)
-- [ ] Phase 10: Más contenido (500+ leyes, decretos)
-- [ ] Phase 11: Web polish + landing page
-- [ ] Phase 12: Mobile (React Native / Expo)
+- ✓ Phase 9: Búsqueda full-text — migration 0007 (tsvector + GIN), route handler GET /api/search, página /buscar, SearchBar en Header, anclas articulo-[N] en vista de lectura
+- ◑ Phase 10: Más contenido — seed de prueba Código de Trabajo (20 artículos placeholder); contenido real pendiente
+- [ ] Phase 11: Jurisprudencias (scraping + panel integrado)
+- [ ] Phase 12: Web polish + landing page
+- [ ] Phase 13: Mobile (React Native / Expo)
+
+---
+
+## Lo que falta en Phase 10 (Más contenido)
+
+- Reemplazar texto placeholder del Código de Trabajo con el texto real (420 artículos)
+- Agregar las demás leyes y códigos (Código Penal, Código Procesal Civil, etc.)
+- Script de importación para cargar PDFs o texto estructurado en bulk
 
 ---
 
@@ -356,3 +387,19 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<publishable key>
 14. **`case_annotations` many-to-many:** `unique(case_id, annotation_id)` previene duplicados. FK cascade en `case_id → cases` y `annotation_id → annotations` — borrar caso o annotation limpia case_annotations automáticamente. Colaboración futura: agregar `case_members(case_id, user_id, role)` sin refactorizar nada.
 
 15. **"Guardar en caso" en ParagraphHighlighter:** fetch de casos del usuario vía browser Supabase client (`createClient()`) al primer click — lazy load, cache en-memoria mientras el tooltip está abierto. El dropdown aparece inline dentro del tooltip (no un portal adicional).
+
+16. **Colecciones de leyes (`law_collections`):** 7 colecciones seeded. SELECT público; escritura solo admin. `law_collection_items.law_id` es `uuid` (no integer) porque `laws.id` es UUID. Items actuales: `default` y `derecho-civil` tienen `codigo-civil`; `default` y `derecho-laboral` tienen `codigo-trabajo`. Resto de colecciones sin items hasta cargar contenido. El UI del selector va en Phase 12 (rediseño). Patrón de insert idempotente con `WHERE EXISTS`.
+
+| slug | name | leyes actuales |
+|---|---|---|
+| `default` | Biblioteca completa | codigo-civil, codigo-trabajo |
+| `derecho-civil` | Derecho Civil | codigo-civil |
+| `derecho-penal` | Derecho Penal | — |
+| `derecho-laboral` | Derecho Laboral | codigo-trabajo |
+| `derecho-mercantil` | Derecho Mercantil | — |
+| `derecho-tributario` | Derecho Tributario | — |
+| `derecho-municipal` | Derecho Municipal | — |
+
+18. **Búsqueda full-text:** `articles` y `paragraphs` tienen columna `search_vector tsvector` populada y mantenida vía triggers (`update_article_search_vector`, `update_paragraph_search_vector`). Índices GIN en ambas. La búsqueda usa `plainto_tsquery('spanish', q)` con configuración española. El route handler GET `/api/search` es público; la página `/buscar` es server-side y corre las mismas queries directamente.
+
+19. **Anclas en vista de lectura:** cada `<article>` en `/leyes/[slug]/[section_id]` tiene `id="articulo-[number]"`. Los links desde `/buscar` apuntan a `#articulo-[number]` para scroll directo al artículo.
