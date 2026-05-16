@@ -1,6 +1,6 @@
 # LexGT — Contexto del proyecto
 
-Última actualización: 2026-05-16 (Phase 9 completa)
+Última actualización: 2026-05-16 (Phase 9 completa, Phase 10 en progreso)
 
 ---
 
@@ -28,29 +28,180 @@
 | Feature | Free | Pro |
 |---|---|---|
 | Leer leyes, códigos, decretos | ✓ | ✓ |
+| Buscar en legislación | ✓ | ✓ |
 | Buscar jurisprudencias (CC + CSJ) | ✓ sesión only | ✓ |
 | Highlights | 1 color (amarillo) | 4 colores (amarillo, verde, azul, rosado) |
 | Notas de texto | ✗ | ✓ |
 | Guardar jurisprudencias | ✗ | ✓ texto completo |
 | Casos (carpetas de trabajo) | ✗ | ✓ |
+| Modos de navegación por caso | ✗ | ✓ |
 | Notificaciones de versioning | ✗ | ✓ |
-
-**Free tier — jurisprudencias:** el usuario puede buscar y leer durante la sesión, pero nada se guarda en la DB. El propósito es no saturar la base con 3,500+ documentos para usuarios que no pagan.
-
-**Tier storage:** el tier de cada usuario se guarda en `user_profiles.tier` ('free' | 'pro'). Se lee con `lib/get-user-tier.ts`. El admin puede cambiarlo desde `/admin`. Los usuarios anónimos siempre son tratados como 'free' en la lógica de negocio, pero se muestran como 'anonymous' en algunos contextos de UI (p.ej. ventana de reformas = 7 días).
 
 ---
 
-## Contenido objetivo al launch
+## Checklist de contenido — Launch (121 leyes)
 
-| Tipo | Cantidad |
-|---|---|
-| Leyes vigentes | 500+ |
-| Códigos | 12 |
-| Decretos | 1,200+ |
-| Jurisprudencias (CC + CSJ) | 3,500+ |
+Leyenda: ✅ en DB y seeded | ⚠️ placeholder (reemplazar) | ⏳ pendiente
 
-Actualmente hay seed del **Código Civil** (Decreto Ley 106) y seed de prueba del **Código de Trabajo** (Decreto 1441). El schema soporta múltiples leyes.
+### Base principal (14)
+
+| # | Ley | En DB | SQL listo |
+|---|---|---|---|
+| 1 | Constitución Política + Ley de Orden Público + Ley de Emisión del Pensamiento | ⏳ | ⏳ |
+| 2 | Ley de Amparo, Exhibición Personal y de Constitucionalidad | ⏳ | ⏳ |
+| 3 | Ley Electoral y de Partidos Políticos | ⏳ | ⏳ |
+| 4 | Ley del Organismo Judicial | ⏳ | ⏳ |
+| 5 | Ley del Organismo Legislativo | ⏳ | ⏳ |
+| 6 | Ley del Organismo Ejecutivo | ⏳ | ⏳ |
+| 7 | Código Civil | ✅ | ✅ |
+| 8 | Código Procesal Civil y Mercantil + Leyes Anexas | ⏳ | ⏳ |
+| 9 | Código de Comercio + Leyes Anexas | ⏳ | ⏳ |
+| 10 | Código de Notariado + Leyes Anexas | ⏳ | ⏳ |
+| 11 | Ley de lo Contencioso Administrativo + Leyes Anexas | ⏳ | ⏳ |
+| 12 | Código Penal + Leyes Anexas | ⏳ | ⏳ |
+| 13 | Código Procesal Penal + Leyes Anexas | ⏳ | ⏳ |
+| 14 | Código de Trabajo + Leyes Anexas | ⏳ | ⚠️ placeholder |
+
+### Leyes Civiles (20)
+
+| # | Ley | En DB | SQL listo |
+|---|---|---|---|
+| 15 | Ley de Adopciones | ⏳ | ⏳ |
+| 16 | Procedimiento Relativo al Hallazgo de Bienes Mostrencos | ⏳ | ⏳ |
+| 17 | Ley General de Caza | ⏳ | ⏳ |
+| 18 | Ley de Garantías Mobiliarias | ⏳ | ⏳ |
+| 19 | Ley de Inquilinato | ⏳ | ⏳ |
+| 20 | Ley de Nacionalidad | ⏳ | ⏳ |
+| 21 | Ley Reguladora de las Áreas de Reservas Territoriales del Estado (OCRET) | ⏳ | ⏳ |
+| 22 | Ley de Organizaciones No Gubernamentales para el Desarrollo (ONG's) | ⏳ | ⏳ |
+| 23 | Ley General de Pesca y Acuicultura | ⏳ | ⏳ |
+| 24 | Ley de la Protección para las Personas de la Tercera Edad | ⏳ | ⏳ |
+| 25 | Ley de Titulación Supletoria | ⏳ | ⏳ |
+| 26 | Ley de Tribunales de Familia | ⏳ | ⏳ |
+| 27 | Ley de Vivienda | ⏳ | ⏳ |
+| 28 | Ley del Registro Nacional de las Personas (RENAP) | ⏳ | ⏳ |
+| 29 | Ley General de Cooperativas | ⏳ | ⏳ |
+| 30 | Ley del Programa de Aporte Económico del Adulto Mayor | ⏳ | ⏳ |
+| 31 | Código de Migración + Ley de Migración (Ley Parcial) | ⏳ | ⏳ |
+| 32 | Ley de Dignificación y Promoción Integral de la Mujer | ⏳ | ⏳ |
+| 33 | Código de Derecho Internacional Privado | ⏳ | ⏳ |
+| 34 | Ley de Aviación Civil | ⏳ | ⏳ |
+
+### Leyes Mercantiles (20)
+
+| # | Ley | En DB | SQL listo |
+|---|---|---|---|
+| 35 | Ley de Propiedad Industrial | ⏳ | ⏳ |
+| 36 | Ley de Actividad Aseguradora | ⏳ | ⏳ |
+| 37 | Ley de Almacenes Generales de Depósito | ⏳ | ⏳ |
+| 38 | Ley de Bancos y Grupos Financieros | ⏳ | ⏳ |
+| 39 | Ley del Mercado de Valores y Mercancías | ⏳ | ⏳ |
+| 40 | Ley de Protección al Consumidor y Usuario | ⏳ | ⏳ |
+| 41 | Ley de Sociedades Financieras Privadas | ⏳ | ⏳ |
+| 42 | Ley de Tarjetas de Crédito | ⏳ | ⏳ |
+| 43 | Ley de Derecho de Autor y Derechos Conexos | ⏳ | ⏳ |
+| 44 | Ley de Libre Negociación de Divisas | ⏳ | ⏳ |
+| 45 | Ley Monetaria | ⏳ | ⏳ |
+| 46 | Convenio de París para la Protección de la Propiedad Industrial | ⏳ | ⏳ |
+| 47 | Convenio de Roma | ⏳ | ⏳ |
+| 48 | Ley de Fortalecimiento al Emprendimiento | ⏳ | ⏳ |
+| 49 | Ley de los Contratos de Factoraje y de Descuento | ⏳ | ⏳ |
+| 50 | Clasificación Internacional de Niza | ⏳ | ⏳ |
+| 51 | Ley para el Reconocimiento de Comunicaciones y Firmas Electrónicas | ⏳ | ⏳ |
+| 52 | Ley de Leasing | ⏳ | ⏳ |
+| 53 | Libro III del Comercio Marítimo — Parte vigente del Código de Comercio Anterior | ⏳ | ⏳ |
+| 54 | Ley de Insolvencia | ⏳ | ⏳ |
+
+### Leyes Notariales (6)
+
+| # | Ley | En DB | SQL listo |
+|---|---|---|---|
+| 55 | Código de Ética Profesional | ⏳ | ⏳ |
+| 56 | Ley de Colegiación Profesional Obligatoria | ⏳ | ⏳ |
+| 57 | Ley sobre el Impuesto de Herencias, Legados y Donaciones | ⏳ | ⏳ |
+| 58 | Ley del Impuesto Único sobre Inmuebles (IUSI) | ⏳ | ⏳ |
+| 59 | Ley del Impuesto al Valor Agregado (IVA) | ⏳ | ⏳ |
+| 60 | Ley del Registro de Información Catastral (RIC) | ⏳ | ⏳ |
+
+### Leyes Administrativas (35)
+
+| # | Ley | En DB | SQL listo |
+|---|---|---|---|
+| 61 | Código Municipal (Decreto 12-2002) | ⏳ | ⏳ |
+| 62 | Código Tributario | ⏳ | ⏳ |
+| 63 | Ley de Acceso a la Información Pública | ⏳ | ⏳ |
+| 64 | Ley de Comisiones de Postulación | ⏳ | ⏳ |
+| 65 | Ley de Contrataciones del Estado | ⏳ | ⏳ |
+| 66 | Ley de Expropiación | ⏳ | ⏳ |
+| 67 | Ley de los Consejos de Desarrollo Urbano y Rural (Decreto 11-2002) | ⏳ | ⏳ |
+| 68 | Ley de Probidad y Responsabilidades de Funcionarios y Empleados Públicos | ⏳ | ⏳ |
+| 69 | Ley en Materia de Antejuicio | ⏳ | ⏳ |
+| 70 | Ley General de Descentralización | ⏳ | ⏳ |
+| 71 | Ley Orgánica de la USAC | ⏳ | ⏳ |
+| 72 | Ley Orgánica del Banco de Guatemala | ⏳ | ⏳ |
+| 73 | Ley Orgánica de la Contraloría General de Cuentas | ⏳ | ⏳ |
+| 74 | Ley de Supervisión Financiera | ⏳ | ⏳ |
+| 75 | Ley Orgánica del Presupuesto | ⏳ | ⏳ |
+| 76 | Ley del Tribunal de Cuentas | ⏳ | ⏳ |
+| 77 | Ley del Impuesto de Solidaridad (ISO) | ⏳ | ⏳ |
+| 78 | Ley de Actualización Tributaria (ISR) | ⏳ | ⏳ |
+| 79 | Ley Orgánica de la SAT | ⏳ | ⏳ |
+| 80 | Disposiciones Legales para el Fortalecimiento de la Administración Tributaria | ⏳ | ⏳ |
+| 81 | Ley Orgánica del IGSS | ⏳ | ⏳ |
+| 82 | Ley de la Carrera Judicial | ⏳ | ⏳ |
+| 83 | Ley Nacional de Aduanas | ⏳ | ⏳ |
+| 84 | Ley Orgánica de la Procuraduría General de la Nación | ⏳ | ⏳ |
+| 85 | Ley de Fomento y Desarrollo de la Actividad Exportadora y de Maquila | ⏳ | ⏳ |
+| 86 | Ley del Tribunal de Conflictos de Jurisdicción (Decreto 64-76) | ⏳ | ⏳ |
+| 87 | Ley de Zonas Francas | ⏳ | ⏳ |
+| 88 | Disposiciones para el Fortalecimiento del Sistema Tributario y el Combate a la Defraudación y al Contrabando | ⏳ | ⏳ |
+| 89 | Ley del Impuesto sobre la Distribución de Bebidas Alcohólicas Destiladas, Cervezas y otras Bebidas Fermentadas | ⏳ | ⏳ |
+| 90 | Ley del Impuesto Específico a la Distribución de Cemento | ⏳ | ⏳ |
+| 91 | Ley del Impuesto a la Distribución de Petróleo Crudo y Combustibles Derivados del Petróleo | ⏳ | ⏳ |
+| 92 | Ley del Impuesto Específico sobre la Distribución de Bebidas Gaseosas, Isotónicas, Jugos, Néctares, Yogures, etc. | ⏳ | ⏳ |
+| 93 | Ley de Simplificación de Requisitos y Trámites Administrativos | ⏳ | ⏳ |
+| 94 | Ley de Simplificación, Actualización e Incorporación Tributaria | ⏳ | ⏳ |
+| 95 | Ley de Universidades Privadas | ⏳ | ⏳ |
+
+### Leyes Penales (19)
+
+| # | Ley | En DB | SQL listo |
+|---|---|---|---|
+| 96 | Ley contra el Femicidio y otras formas de Violencia contra la Mujer | ⏳ | ⏳ |
+| 97 | Ley contra el Lavado de Dinero u otros Activos | ⏳ | ⏳ |
+| 98 | Ley contra la Defraudación y Contrabando Aduanero | ⏳ | ⏳ |
+| 99 | Ley contra la Delincuencia Organizada | ⏳ | ⏳ |
+| 100 | Ley contra la Narcoactividad | ⏳ | ⏳ |
+| 101 | Ley para Prevenir, Sancionar y Erradicar la Violencia Intrafamiliar | ⏳ | ⏳ |
+| 102 | Ley contra la Violencia Sexual, Explotación y Trata de Personas | ⏳ | ⏳ |
+| 103 | Ley de Armas y Municiones | ⏳ | ⏳ |
+| 104 | Ley de Extinción de Dominio | ⏳ | ⏳ |
+| 105 | Ley del Régimen Penitenciario | ⏳ | ⏳ |
+| 106 | Ley del Servicio Público de Defensa Penal | ⏳ | ⏳ |
+| 107 | Ley para la Protección de Sujetos Procesales | ⏳ | ⏳ |
+| 108 | Ley Orgánica del INACIF | ⏳ | ⏳ |
+| 109 | Ley Orgánica del Ministerio Público (MP) | ⏳ | ⏳ |
+| 110 | Ley de Protección Integral de la Niñez y Adolescencia (PINA) | ⏳ | ⏳ |
+| 111 | Ley para Prevenir y Reprimir el Financiamiento del Terrorismo (Decreto 58-2005) | ⏳ | ⏳ |
+| 112 | Ley Reguladora del Procedimiento de Extradición | ⏳ | ⏳ |
+| 113 | Ley de Implementación del Control Telemático en el Proceso Penal | ⏳ | ⏳ |
+| 114 | Convención de Viena sobre el Derecho de los Tratados | ⏳ | ⏳ |
+
+### Leyes Laborales (7)
+
+| # | Ley | En DB | SQL listo |
+|---|---|---|---|
+| 115 | Ley de Servicio Civil | ⏳ | ⏳ |
+| 116 | Ley de Servicio Municipal | ⏳ | ⏳ |
+| 117 | Convenios Fundamentales de la OIT | ⏳ | ⏳ |
+| 118 | Ley de Clases Pasivas Civiles del Estado | ⏳ | ⏳ |
+| 119 | Ley de Servicio Civil del Organismo Judicial | ⏳ | ⏳ |
+| 120 | Ley de Servicio Civil del Organismo Legislativo | ⏳ | ⏳ |
+| 121 | Ley de Sindicalización y Regulación de la Huelga de los Trabajadores del Estado | ⏳ | ⏳ |
+
+**Progreso: 1/121 en DB ✅ — 0/121 placeholder ⚠️ — 120/121 pendientes ⏳**
+
+**Flujo de carga de contenido:** proyecto separado "LexGT Content Extractor" en claude.ai procesa documentos (PDF, Word, texto) y genera SQL compatible con el schema. Output: un bloque SQL por ley, idempotente (`ON CONFLICT DO NOTHING`), listo para Supabase SQL Editor.
 
 ---
 
@@ -68,38 +219,47 @@ Las credenciales están en `.env.local` (no commiteado, en gitignore).
 | `0002_versioning.sql` | Columnas de versioning en articles, tablas law_reforms y reform_notifications |
 | `0003_reform_status.sql` | status en law_reforms, published_at nullable, tabla reform_draft_articles, función auth.is_admin() |
 | `0004_user_profiles.sql` | Tabla user_profiles, trigger on_auth_user_created, función admin_find_user_by_email |
-| `0005_annotations_color_note.sql` | Idempotent: `color NOT NULL DEFAULT 'yellow'`, `note nullable` (ya existían en 0001; migration de tracking) |
+| `0005_annotations_color_note.sql` | Idempotent: `color NOT NULL DEFAULT 'yellow'`, `note nullable` |
 | `0006_cases.sql` | Tablas `cases` y `case_annotations` (many-to-many) con RLS owner; cascade en ambas FKs |
-| `0007_search.sql` | `search_vector tsvector` en `articles` y `paragraphs`; triggers + funciones de actualización; índices GIN; backfill de filas existentes |
-| `0008_collections.sql` | Tablas `law_collections` y `law_collection_items`; RLS público/admin; seed de 7 colecciones + 4 items (codigo-civil y codigo-trabajo). `law_id` es uuid (no integer). |
+| `0007_search.sql` | `search_vector tsvector` en articles y paragraphs, índices GIN, triggers automáticos, backfill completo |
+| `0008_collections.sql` | Tablas `law_collections` y `law_collection_items`. Seed de 7 colecciones predeterminadas. |
 
 ### Tablas activas
 
 | Tabla | Notas |
 |---|---|
-| `laws` | 2 filas: Código Civil (slug: `codigo-civil`) + Código de Trabajo (slug: `codigo-trabajo`, seed de prueba) |
+| `laws` | 1 fila real: Código Civil. Código de Trabajo pendiente de cargar con contenido real. |
 | `sections` | Jerarquía: libro → titulo → capitulo. `kind` en español. |
-| `articles` | 1,996+ filas. Columnas de versioning: `version_number`, `superseded_at`, `previous_version_id`, `reform_id`. `is_current=false` en versiones antiguas. Columna `search_vector tsvector` (migration 0007). |
-| `paragraphs` | Texto por artículo, ordenado por `position`. Columna `search_vector tsvector` (migration 0007). |
-| `annotations` | Solo el dueño puede leer/escribir. `is_pinned_to_old_version` para annotations migradas. |
-| `law_reforms` | Reformas publicadas y borradores. `status`: `'draft'` | `'published'`. `published_at` nullable (null en drafts). |
-| `reform_notifications` | Reformas ya vistas por el usuario. RLS owner-only SELECT + INSERT. |
-| `reform_draft_articles` | Texto nuevo por artículo antes de publicar. RLS admin-only. |
-| `user_profiles` | Un row por usuario auth. `tier`: `'free'` | `'pro'`. `tier_expires_at` nullable. Creado automáticamente en signup via trigger. |
+| `articles` | Versioning: `version_number`, `superseded_at`, `previous_version_id`, `reform_id`. `search_vector` indexado. |
+| `paragraphs` | Texto por artículo, ordenado por `position`. `search_vector` indexado. |
+| `annotations` | Owner CRUD. `is_pinned_to_old_version` para annotations migradas. |
+| `law_reforms` | `status`: `'draft'` \| `'published'`. `published_at` nullable. |
+| `reform_notifications` | RLS owner-only SELECT + INSERT. |
+| `reform_draft_articles` | RLS admin-only. |
+| `user_profiles` | `tier`: `'free'` \| `'pro'`. `tier_expires_at` nullable. Trigger en signup. |
+| `cases` | Carpetas Pro. `color`: gray/blue/green/red/amber/purple. RLS owner. |
+| `case_annotations` | Many-to-many. `unique(case_id, annotation_id)`. FK cascade en ambas. |
+| `law_collections` | 7 colecciones seeded. `is_default=true` en `default`. RLS lectura pública. |
+| `law_collection_items` | Items activos solo para las leyes en prod. RLS lectura pública. `law_id` es UUID. |
 
-### Tablas activas (continuación)
+### Colecciones predeterminadas (seeded)
 
-| Tabla | Notas |
-|---|---|
-| `cases` | Carpetas Pro. `color` string preset (gray/blue/green/red/amber/purple). RLS owner all. |
-| `case_annotations` | Many-to-many. `unique(case_id, annotation_id)`. FK cascade en ambas. RLS via join a cases. |
-| `law_collections` | id serial, slug único, name, description, position, is_default. RLS: SELECT público, escritura admin. 7 colecciones seeded. |
-| `law_collection_items` | id serial, collection_id → law_collections, law_id (uuid) → laws, position. UNIQUE(collection_id, law_id). RLS: SELECT público, escritura admin. |
+| Slug | Nombre | Items activos |
+|---|---|---|
+| `default` | Biblioteca completa | codigo-civil |
+| `derecho-civil` | Derecho Civil | codigo-civil |
+| `derecho-penal` | Derecho Penal | — (pendiente contenido) |
+| `derecho-laboral` | Derecho Laboral | — (pendiente contenido) |
+| `derecho-mercantil` | Derecho Mercantil | — (pendiente contenido) |
+| `derecho-tributario` | Derecho Tributario | — (pendiente contenido) |
+| `derecho-municipal` | Derecho Municipal | — (pendiente contenido) |
+
+Items se agregan automáticamente al cargar cada ley en Phase 10.
 
 ### Tablas pendientes de migrar
 
-#### `saved_jurisprudences` (Pro)
 ```sql
+-- Phase 13 (jurisprudencias Pro)
 saved_jurisprudences: id, user_id, source ('CC'|'CSJ'), external_id, title, full_text, url, saved_at
 ```
 
@@ -108,80 +268,122 @@ saved_jurisprudences: id, user_id, source ('CC'|'CSJ'), external_id, title, full
 | Tabla | Política |
 |---|---|
 | `laws`, `sections`, `articles`, `paragraphs` | Lectura pública |
+| `law_collections`, `law_collection_items` | Lectura pública; INSERT/UPDATE/DELETE solo admin |
 | `annotations` | Owner CRUD |
 | `cases` | Owner all |
 | `case_annotations` | Owner all (via join a cases) |
-| `law_reforms` | SELECT público; INSERT/UPDATE solo admin (`auth.is_admin()`) |
+| `law_reforms` | SELECT público; INSERT/UPDATE solo admin |
 | `reform_notifications` | SELECT + INSERT solo owner |
 | `reform_draft_articles` | CRUD solo admin |
 | `user_profiles` | SELECT + UPDATE owner; INSERT + UPDATE admin |
-| `law_collections` | SELECT público; INSERT/UPDATE/DELETE solo admin |
-| `law_collection_items` | SELECT público; INSERT/UPDATE/DELETE solo admin |
 
 ### Funciones PostgreSQL
 
-- `public.is_admin()` — verifica `auth.jwt()->'user_metadata'->>'role' = 'admin'`. Usada en RLS. (Originalmente escrita como `auth.is_admin()` pero Supabase SQL Editor no permite crear funciones en el schema `auth`.)
-- `public.handle_new_user()` — trigger `security definer` que crea fila en `user_profiles` al registrarse.
-- `public.admin_find_user_by_email(email)` — `security definer`, verifica admin, retorna `uuid` del usuario. Permite al panel admin buscar usuarios sin service role key.
-
-### Seeds de prueba
-
-`supabase/seeds/test_reform.sql` — inserta una reforma ficticia sobre el Artículo 1 del Código Civil: clona la versión 1 en versión 2 con texto modificado y la marca como superseded. Útil para probar la UI de reformas.
-
-`supabase/seeds/codigo_trabajo.sql` — **Código de Trabajo (Decreto 1441)** con estructura real y texto placeholder. Incluye: 1 ley, Libro I completo (Título I sin capítulos, Título II con 2 capítulos, Título III con 2 capítulos), 20 artículos con párrafos. Valida: /leyes con múltiples leyes, árbol de secciones de /leyes/codigo-trabajo, búsqueda full-text con palabras clave (trabajador, patrono, contrato). El contenido real se cargará en Phase 11. UUIDs: ley=`b000...0002`, secciones=`b100...000X`, artículos=`b200...000X`, párrafos=`b300...000X`.
+- `public.is_admin()` — verifica JWT para RLS. En schema `public`.
+- `public.handle_new_user()` — trigger que crea fila en `user_profiles` al registrarse.
+- `public.admin_find_user_by_email(email)` — security definer, busca usuario sin service role key.
 
 ---
 
-## Jurisprudencias — integración
+## Modos de navegación — planificado (Phase 11)
 
-**Fuentes:** Corte de Constitucionalidad (CC) y Corte Suprema de Justicia (CSJ). No tienen API pública — la integración es vía web scraping o similar.
+El sidebar tiene un selector de modo que reorganiza la lista de leyes según un contexto de trabajo.
 
-**Flujo:**
-- El usuario busca desde dentro de LexGT
-- Los resultados se muestran en un panel integrado dentro de la app (no redirige al sitio oficial)
-- Free: puede buscar y leer durante la sesión. Nada se persiste en DB.
-- Pro: puede guardar en `saved_jurisprudences` y hacer annotations sobre ellas.
+### Tres tipos de modo
 
-**Implementación pendiente de diseñar.** Evaluar si el scraping corre en un backend separado (Railway/Render) o como Route Handler de Next.js.
+| Tipo | Quién lo define | Disponible para |
+|---|---|---|
+| Default (Biblioteca completa) | Curador | Todos |
+| Rama del derecho | Curador | Todos |
+| Caso | El usuario | Solo Pro |
+
+El usuario no puede crear ni modificar modos predeterminados. Solo puede activar modos de caso a partir de sus casos Pro existentes.
+
+### Modos predeterminados (7)
+
+| Slug | Nombre | Leyes incluidas |
+|---|---|---|
+| `default` | Biblioteca completa | Constitución → todos los códigos → leyes vigentes |
+| `derecho-civil` | Derecho Civil | Código Civil, Procesal Civil y Mercantil, Código de Comercio, Ley del Organismo Judicial |
+| `derecho-penal` | Derecho Penal | Constitución (Título VI), Código Penal, Código Procesal Penal |
+| `derecho-laboral` | Derecho Laboral | Constitución (Título II), Código de Trabajo |
+| `derecho-mercantil` | Derecho Mercantil | Código de Comercio, Código Civil (Libro V), Ley del Organismo Judicial |
+| `derecho-tributario` | Derecho Tributario | Código Tributario, Constitución (Art. 239-243) |
+| `derecho-municipal` | Derecho Municipal | Código Municipal, Ley del Organismo Judicial, Constitución (Título VI) |
+
+### Modo "Caso" (Pro)
+
+- El usuario selecciona uno de sus casos en el selector de modo
+- **Sidebar izquierdo:** solo muestra las leyes que tienen highlights de ese caso, ordenadas por cantidad de highlights (descendente)
+- **Panel derecho:** cambia automáticamente a la lista de highlights de ese caso (el contenido que hoy está en `/casos/[id]`)
+- Click en un highlight del panel derecho → navega al artículo y hace scroll al fragmento
+- La lista de leyes se deriva en runtime: `case_annotations → annotations → paragraphs → articles → sections → laws` — no requiere tabla adicional
+
+### Impacto en el layout
+
+- Selector de modo: en la parte superior del sidebar izquierdo
+- Modo default activo al entrar (o el último usado, guardado en localStorage)
+- En modo "Caso": el panel derecho se bloquea en la tab de highlights del caso activo
+- En cualquier otro modo: panel derecho funciona normalmente (Notas / Caso / Concordancias / Historial)
+
+---
+
+## Búsqueda full-text — Phase 9 ✓
+
+- **`0007_search.sql`:** `search_vector tsvector` en `articles` y `paragraphs`, índices GIN, triggers automáticos, backfill completo.
+- **`GET /api/search`:** parámetros `q` (mínimo 2 chars), `law` (slug, opcional), `limit` (default 20, max 50). Deduplica por `article_id`.
+- **Response shape:**
+  ```ts
+  {
+    results: Array<{
+      article_id: string
+      article_number: string
+      article_heading: string | null
+      snippet: string
+      law_slug: string
+      law_short_name: string
+      section_id: string
+    }>
+    total: number
+    query: string
+  }
+  ```
+- **`/buscar`:** Server Component. Estado vacío, sin resultados, lista con snippet + ley + link a `#articulo-[N]`.
+- **Header:** input búsqueda desktop + mobile. Submit → `/buscar?q=`. ⌘K en Phase 11.
+- **Anclas:** `id="articulo-[N]"` en cada artículo de la vista de lectura.
 
 ---
 
 ## Versioning de artículos — implementado
 
 - `articles.is_current = false` en versiones antiguas, nunca se borran.
-- `previous_version_id` apunta al artículo anterior; `reform_id` apunta a la reforma que lo creó.
-- `law_reforms` registra cada reforma con `published_at` y `status`.
-- `reform_notifications` guarda qué reformas ya vio cada usuario.
-
-### Flujo de notificación (UI en /leyes)
-
-1. `app/leyes/page.tsx` (Server Component) calcula las reformas no vistas por tier:
-   - Anónimo: últimos 7 días
-   - Free: último mes
-   - Pro: últimos 6 meses
-2. Pasa `pendingReforms` y `articlePairsByReform` a cada `<LawCard>`.
-3. `LawCard` muestra badge rojo con el número. Al click abre `ReformModal`.
-4. `ReformModal` bloquea botones hasta que el usuario llega al fondo (IntersectionObserver).
-5. Si el usuario tiene annotations en artículos superseded → botones "Borrar mis notas" o "Conservar como anexo". Si no → "Entendido".
-6. Al confirmar: llama `migrateAnnotations()` (si aplica) y luego `markReformSeen()`.
-
-### Flujo de publicación (panel admin)
-
-1. Admin crea borrador en `/admin/reformas/nueva`: selecciona ley, busca artículos por número, pega texto nuevo.
-2. `createReformDraft()` inserta en `law_reforms (status='draft')` y `reform_draft_articles`.
-3. Admin revisa en `/admin/reformas/[id]`: vista lado a lado del texto vigente vs nuevo.
-4. "Publicar reforma" → `approveReform()`: inserta nueva versión de cada artículo, marca la vieja como superseded, actualiza `status='published'`.
+- `law_reforms` + `reform_notifications` para tracking por usuario.
+- Flujo de notificación en `/leyes` con badge rojo, `ReformModal` con IntersectionObserver.
+- Panel admin en `/admin/reformas` para crear, revisar y publicar reformas.
 
 ---
 
 ## Panel de administrador (`/admin`)
 
-- **Protección doble:** middleware redirige a `/` si `user.user_metadata.role !== 'admin'`; el layout hace un segundo chequeo.
-- **Rol admin:** se setea manualmente en el dashboard de Supabase (`user_metadata.role = 'admin'`). No hay migration para esto.
-- **Rutas:**
-  - `/admin` — lista de reformas en borrador + formulario de gestión de tiers
-  - `/admin/reformas/nueva` — formulario de creación de reforma (Server Component wrapper + Client Component form)
-  - `/admin/reformas/[id]` — revisión y publicación de reforma
+- Protección doble: middleware + layout.
+- Rol admin: `user_metadata.role = 'admin'` en Supabase dashboard.
+- Rutas: `/admin`, `/admin/reformas/nueva`, `/admin/reformas/[id]`
+
+---
+
+## Rediseño visual — Phase 11
+
+Mock funcional ya creado en Claude Design. Auditado contra el schema real.
+
+**Cambios confirmados para implementar:**
+- Layout: sidebar izquierdo fijo + panel derecho deslizable (Notas / Caso / Concordancias / Historial)
+- Header: barra de búsqueda central con ⌘K
+- Sidebar: selector de modo en la parte superior, sección "Leyes" unificada, "Jurisprudencias" como Próximamente, sin Favoritos
+- TOC como pantalla propia, lectura con side rail colapsable
+- Concordancias: tab presente, estado vacío ("próximamente")
+- 6 tokens de color para casos (pendiente definir en Design)
+
+**Pantallas pendientes en Design:** `/leyes`, `/leyes/[slug]`, `/buscar`, `/casos`, `/casos/[id]`, auth, diff de reforma, landing page, selector de modo en sidebar, panel derecho en modo "Caso".
 
 ---
 
@@ -192,70 +394,73 @@ app/
   page.tsx                              → redirect a /leyes
   layout.tsx                            → root layout con <Header /> global
   globals.css
-  buscar/
-    page.tsx                            → búsqueda full-text (server component); lee ?q= y ?law=; consulta articles + paragraphs via search_vector
   api/
     search/
-      route.ts                          → GET /api/search?q=&law=&limit= — endpoint público de búsqueda full-text; response: { results, total, query }
+      route.ts                          → GET /api/search?q=&law=&limit=
+  buscar/
+    page.tsx                            → página de resultados full-text
   leyes/
-    page.tsx                            → lista de leyes + badges de reformas pendientes (server component)
-    actions.ts                          → saveAnnotation (color + note + Pro validation),
-                                          deleteAnnotation, updateAnnotationNote (Pro only),
+    page.tsx                            → lista de leyes + badges de reformas pendientes
+    actions.ts                          → saveAnnotation, deleteAnnotation, updateAnnotationNote,
                                           migrateAnnotations, markReformSeen, publishReform
     [slug]/
       page.tsx                          → tabla de contenidos con árbol de secciones
       [section_id]/
         page.tsx                        → vista de lectura: artículos + párrafos + highlights
   casos/
-    page.tsx                            → lista de casos (server component, guard Pro)
-    CasesClient.tsx                     → client component: modal "Nuevo caso" + lista
+    page.tsx                            → lista de casos (guard Pro)
+    CasesClient.tsx                     → modal "Nuevo caso" + lista
     actions.ts                          → createCase, deleteCase, addAnnotationToCase, removeAnnotationFromCase
     [id]/
-      page.tsx                          → detalle de caso: highlights + notas (server component)
+      page.tsx                          → detalle de caso
   auth/
-    actions.ts                          → server action: signOut()
-    login/page.tsx                      → formulario login (client component)
-    register/page.tsx                   → formulario registro (client component)
+    actions.ts                          → signOut()
+    login/page.tsx
+    register/page.tsx
   admin/
-    layout.tsx                          → sidebar admin + doble chequeo de rol (server component)
-    page.tsx                            → lista de borradores + TierForm
+    layout.tsx
+    page.tsx
     actions.ts                          → findArticle, createReformDraft, approveReform, setUserTier
-    TierForm.tsx                        → client component: form para cambiar tier de un usuario
+    TierForm.tsx
     reformas/
       nueva/
-        page.tsx                        → server wrapper (fetcha leyes)
-        NewReformForm.tsx               → client component: formulario completo de reforma
+        page.tsx
+        NewReformForm.tsx
       [id]/
-        page.tsx                        → revisión de borrador + botón publicar (server component)
+        page.tsx
 
 components/
-  Header.tsx                            → header global con estado de auth (server component); incluye <SearchBar /> en el centro
-  SearchBar.tsx                         → client component: form de búsqueda → /buscar?q=...; mobile: ícono lupa que expande
-  ParagraphHighlighter.tsx              → client component: selección de texto, tooltip, highlights
-  LawCard.tsx                           → client component: card de ley con badge de reformas + modal
-  ReformModal.tsx                       → client component: modal de reforma con IntersectionObserver
+  Header.tsx                            → header global + barra de búsqueda (desktop + mobile)
+  SearchBar.tsx                         → client component: form → /buscar?q=; mobile: lupa icon
+  ParagraphHighlighter.tsx              → selección de texto, tooltip, highlights, "Guardar en caso"
+  LawCard.tsx                           → card de ley con badge de reformas + modal
+  ReformModal.tsx                       → modal de reforma con IntersectionObserver
 
 lib/
-  supabase.ts                           → createClient() — browser client ONLY
-  supabase-server.ts                    → createServerSupabaseClient() — server only (usa next/headers)
+  supabase.ts                           → createClient() — browser ONLY
+  supabase-server.ts                    → createServerSupabaseClient() — server only
   get-user-tier.ts                      → getUserTier(supabase): Promise<Tier> — server-only
   types.ts                              → Law, Section, Article, Paragraph, ArticleWithParagraphs,
                                           SectionNode, Annotation, LawReform, ReformNotification,
                                           Tier, UserProfile, Case, CaseAnnotation,
                                           LawCollection, LawCollectionItem
 
-middleware.ts                           → refresca cookie de sesión; protege /admin/* redirigiendo a /
+middleware.ts                           → refresca cookie; protege /admin/*
 
 supabase/
   migrations/
-    0001_initial_schema.sql             → schema base (aplicado en prod)
-    0002_versioning.sql                 → versioning columns + law_reforms + reform_notifications
-    0003_reform_status.sql              → status en law_reforms + reform_draft_articles + auth.is_admin()
-    0004_user_profiles.sql              → user_profiles + trigger + admin_find_user_by_email
-    0005_annotations_color_note.sql     → idempotent tracking: color + note en annotations
-  seed.sql                              → Código Civil completo (aplicado en prod)
-  seeds/test_reform.sql                 → reforma ficticia sobre Artículo 1 para pruebas
-  seeds/codigo_trabajo.sql              → Código de Trabajo (Decreto 1441): 1 ley + Libro I + 20 artículos placeholder
+    0001_initial_schema.sql
+    0002_versioning.sql
+    0003_reform_status.sql
+    0004_user_profiles.sql
+    0005_annotations_color_note.sql
+    0006_cases.sql
+    0007_search.sql
+    0008_collections.sql                → law_collections + law_collection_items + 7 colecciones seeded
+  seed.sql                              → Código Civil completo
+  seeds/
+    test_reform.sql                     → reforma ficticia para pruebas
+    codigo_trabajo.sql                  → SQL placeholder (20 artículos inventados — reemplazar con real)
 ```
 
 ---
@@ -263,143 +468,79 @@ supabase/
 ## Páginas implementadas
 
 ### `/leyes`
-Lista leyes activas. Cada `LawCard` muestra badge rojo si hay reformas no vistas. Click en card con reformas abre `ReformModal`; sin reformas es un `<Link>` normal. El tier del usuario se lee desde `user_profiles` via `getUserTier()`.
+Lista leyes activas con badge de reformas pendientes por tier (anónimo 7d, free 1m, pro 6m).
 
 ### `/leyes/[slug]`
-Tabla de contenidos. Árbol recursivo (libro → titulo → capitulo). Las secciones hoja son links a la vista de lectura.
+Tabla de contenidos. Árbol recursivo (libro → titulo → capitulo).
 
 ### `/leyes/[slug]/[section_id]`
-Vista de lectura. Artículos + párrafos. Sticky breadcrumb. `max-w-2xl`. Highlighting con soporte de tier: Free = solo amarillo; Pro = 4 colores (amarillo, verde, azul, rosado) con selector de color al crear y editor de nota al click en mark existente. Annotations se fetchean server-side; `getUserTier()` corre en paralelo en el mismo `Promise.all`. Se pasa `tier` a `ParagraphHighlighter`.
-
-### `/auth/login` y `/auth/register`
-Client Components. Login llama `signInWithPassword()`, register llama `signUp()`. Ambos manejan errores inline. `register` muestra pantalla de éxito si Supabase requiere confirmación de email. Al registrarse, el trigger `on_auth_user_created` crea automáticamente la fila en `user_profiles`.
-
-### `/admin`
-Panel administrativo protegido. Lista reformas en borrador. Formulario `TierForm` para cambiar el tier de un usuario por email.
-
-### `/admin/reformas/nueva`
-Formulario para crear una reforma. Búsqueda de artículos por número dentro de una ley. Permite agregar múltiples artículos con su texto reformado. Guarda como borrador.
-
-### `/admin/reformas/[id]`
-Revisión de un borrador. Comparación lado a lado: texto vigente vs texto nuevo. Botón "Publicar reforma" ejecuta `approveReform()` via Server Action form.
-
-### `/casos`
-Server Component con guard Pro. Lista casos del usuario ordenados por `updated_at desc`. Muestra título, color (borde izquierdo), número de highlights y fecha. `CasesClient.tsx` maneja el modal "Nuevo caso" (título, descripción, color picker: gray/blue/green/red/amber/purple). Al crear: llama `createCase()` + `router.refresh()`.
-
-### `/casos/[id]`
-Server Component. Detalle del caso: título, descripción, lista de highlights via join `case_annotations → annotations → paragraphs + articles`. Muestra excerpt resaltado con el color correcto, nota si existe, artículo de referencia. Botones vía form actions: "Eliminar del caso" llama `removeAnnotationFromCase(caId)`, "Eliminar caso" llama `deleteCase(id)` que redirecta a `/casos`.
+Vista de lectura. Sticky breadcrumb. `max-w-2xl`. Highlighting por tier. Anclas `#articulo-[N]`.
 
 ### `/buscar`
-Server Component. Lee `?q=` y `?law=` de searchParams. Si `q` tiene menos de 2 chars: pantalla vacía con instrucciones. Con `q` válido: ejecuta búsqueda full-text en paralelo sobre `articles.search_vector` y `paragraphs.search_vector` usando `plainto_tsquery('spanish', q)`, desduplicando por `article_id`. Lista resultados con número de artículo, heading, snippet (primeros párrafos) y nombre de ley. Click → `/leyes/[slug]/[section_id]#articulo-[number]`. Muestra total de resultados.
+Búsqueda full-text. Input en header → redirect. Resultados con snippet, ley, link directo al artículo.
 
-### `GET /api/search`
-Route Handler público (no requiere auth). Params: `q` (req, min 2 chars), `law` (slug, opcional), `limit` (default 20, max 50). Busca en articles y paragraphs por `search_vector`. Retorna `{ results, total, query }`. Útil para llamadas AJAX futuras desde Client Components.
+### `/casos` y `/casos/[id]`
+Carpetas Pro. CRUD completo. Highlights con color, nota y referencia a artículo.
 
----
+### `/auth/login` y `/auth/register`
+Client Components. Errores inline. Trigger crea `user_profiles` en signup.
 
-## Middleware
-
-`middleware.ts` llama `getUser()` en cada request para refrescar cookies. Redirige `/admin/*` a `/` si el usuario no es admin. Las páginas de lectura son públicas por diseño.
-
----
-
-## Variables de entorno
-
-`.env.local` (no commiteado):
-```
-NEXT_PUBLIC_SUPABASE_URL=https://enrykddxhqsibbokrood.supabase.co
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<publishable key>
-```
-
-`.env.local.example` está commiteado con las keys vacías como referencia.
+### `/admin` y subrutas
+Panel protegido. Gestión de reformas (crear/revisar/publicar) y tiers de usuarios.
 
 ---
 
 ## Build order
 
 - ✓ Phase 1: Database schema
-- ✓ Phase 2: Auth + estructura de tiers (base)
+- ✓ Phase 2: Auth + estructura de tiers
 - ✓ Phase 3: Seed Código Civil + law browser
-- ✓ Phase 4: Read (tabla de contenidos + vista de lectura)
+- ✓ Phase 4: Read (TOC + vista de lectura)
 - ✓ Phase 5: Basic highlighting (free tier, amarillo)
-- ✓ Phase 6: Versioning logic (DB + UI de notificaciones + migración de annotations)
-- ✓ Phase 6.5: Panel admin (crear/revisar/publicar reformas)
-- ✓ Phase 7: Pro tier — S1 (user_profiles + getUserTier + admin tier management) + S2 (multi-color highlights + notes)
-- ✓ Phase 8: Casos (Pro) — cases + case_annotations, /casos CRUD, "Guardar en caso" en highlights
-- ✓ Phase 9: Búsqueda full-text — migration 0007 (tsvector + GIN), route handler GET /api/search, página /buscar, SearchBar en Header, anclas articulo-[N] en vista de lectura
-- ◑ Phase 10: Más contenido — seed de prueba Código de Trabajo (20 artículos placeholder); contenido real pendiente
-- [ ] Phase 11: Jurisprudencias (scraping + panel integrado)
-- [ ] Phase 12: Web polish + landing page
-- [ ] Phase 13: Mobile (React Native / Expo)
-
----
-
-## Lo que falta en Phase 10 (Más contenido)
-
-- Reemplazar texto placeholder del Código de Trabajo con el texto real (420 artículos)
-- Agregar las demás leyes y códigos (Código Penal, Código Procesal Civil, etc.)
-- Script de importación para cargar PDFs o texto estructurado en bulk
+- ✓ Phase 6: Versioning logic
+- ✓ Phase 6.5: Panel admin
+- ✓ Phase 7: Pro tier (user_profiles + multi-color highlights + notes)
+- ✓ Phase 8: Casos (Pro)
+- ✓ Phase 9: Búsqueda full-text (tsvector + GIN + /buscar + header search)
+- ⏳ Phase 10: Contenido — 121 leyes (ver checklist arriba). SQL generándose en "LexGT Content Extractor"
+- [ ] Phase 11: Web polish + rediseño completo (mock listo en Claude Design, auditoría completa)
+          Incluye: nuevo layout, sidebar con modos de navegación, panel derecho, ⌘K, landing page
+          Requiere: 0008_collections.sql ✓ ya aplicado
+- [ ] Phase 12: Deploy (Vercel + Supabase free tier, $0)
+- [ ] Phase 13: Jurisprudencias (Railway + Playwright, ~$5/mes, post-launch)
+- [ ] Phase 14: Pagos (Visanet)
+- [ ] Phase 15: Mobile (React Native / Expo)
 
 ---
 
 ## Lo que falta construir
 
-- **Phase 7 S2:** ✓ Completada. Highlights multi-color (verde, azul, rosado) y notas inline para Pro.
-- **Casos:** ✓ Phase 8 completada. Schema migrado, CRUD implementado, integrado en ParagraphHighlighter.
-- **Jurisprudencias:** scraping + panel de búsqueda integrado. Diseño pendiente.
-- **Más contenido:** agregar leyes, códigos y decretos al seed.
-- **Password reset:** Supabase lo soporta, no está en la UI.
-- **OAuth:** no implementado, solo email/password.
-- **Mobile nav:** responsive básico, sin nav mobile.
-- **Deploy:** no hay CI/CD ni configuración de Vercel.
-- **Landing page:** stats: 500+ leyes, 12 códigos, 1,200+ decretos, 3,500+ jurisprudencias.
+- **Phase 10:** aplicar SQL de 121 leyes desde "LexGT Content Extractor". Ver checklist de contenido. El archivo `supabase/seeds/codigo_trabajo.sql` es placeholder — reemplazar con el real cuando esté listo.
+- **Phase 11:** rediseño visual completo. Incluye selector de modos de navegación en sidebar. `0008_collections.sql` ya está aplicado — Phase 11 puede arrancar en cualquier momento.
+- **Phase 12:** deploy en Vercel. Dominio cuando haya usuarios reales.
+- **Phase 13:** jurisprudencias — Railway + Playwright para scraping CC/CSJ (ASP.NET WebForms con `__VIEWSTATE`, requiere browser headless).
+- **Phase 14:** pagos — Visanet. Schema ya preparado, solo webhook de tier.
+- **Phase 15:** mobile — React Native / Expo.
+- **Password reset / OAuth:** no implementado.
+- **Landing page:** incluida en Phase 11.
+- **Design pendiente:** tokens de color de caso (6), pantallas `/leyes`, `/leyes/[slug]`, `/buscar`, `/casos`, `/casos/[id]`, auth, diff de reforma, landing page, selector de modo, panel derecho en modo "Caso".
 
 ---
 
 ## Decisiones técnicas relevantes
 
-1. **`supabase.ts` vs `supabase-server.ts` separados:** obligatorio — `next/headers` no se puede importar en Client Components. Si se juntan, todos los formularios de auth se rompen.
-
-2. **`sections.kind` en español:** el seed usa `libro/titulo/capitulo`. El schema fue migrado de inglés a español durante el setup inicial. Los `KIND_LABEL` maps en los pages usan estas mismas claves.
-
-3. **Server Actions para mutaciones:** `signOut`, `saveAnnotation`, `deleteAnnotation`, `migrateAnnotations`, `markReformSeen`, `publishReform`, `createReformDraft`, `approveReform`, `setUserTier` — todos son Server Actions. Los formularios de login/register son Client Components porque necesitan estado React para errores.
-
-4. **Middleware protege `/admin/*`:** doble chequeo — middleware redirige, layout también verifica. El rol admin se setea via Supabase dashboard en `user_metadata.role = 'admin'`.
-
-5. **`public.is_admin()`:** función PostgreSQL que inspecciona el JWT para RLS. Usada en las policies de `law_reforms`, `reform_draft_articles` y `user_profiles`. Definida en `public` (no `auth`) porque Supabase SQL Editor no permite CREATE en el schema `auth`.
-
-6. **`admin_find_user_by_email()`:** función `security definer` que permite al admin buscar usuarios en `auth.users` sin necesitar la service role key. Verifica internamente que el llamador sea admin.
-
-7. **`getUserTier(supabase)`:** server-only (`import 'server-only'`). Recibe el cliente Supabase existente para reutilizarlo. Verifica expiración de tier. Se llama en paralelo con `getUser()` en `leyes/page.tsx` para no añadir latencia.
-
-8. **Ventana de reformas por tier:** anónimo = 7 días, free = 1 mes, pro = 6 meses. Se aplica en `/leyes/page.tsx` como filtro de `published_at`.
-
-9. **`migrateAnnotations` acción:** action en `leyes/actions.ts`. `delete` borra las annotations del artículo viejo. `migrate` crea nuevas annotations en el artículo nuevo con `char_start=0, char_end=0` y el texto original como blockquote en la nota. Usa join `paragraphs(text)` para recuperar el texto highlightado.
-
-10. **`approveReform` no llama `publishReform`:** aunque ambas hacen el mismo trabajo de versioning, `approveReform` usa el `reform_id` ya existente (el borrador) en lugar de crear un row nuevo en `law_reforms`. Si se llamara `publishReform`, se crearía un duplicado.
-
-11. **Tooltip de highlighting via portal:** `ParagraphHighlighter` renderiza el tooltip con `createPortal(…, document.body)` para evitar que un `<div>` sea hijo de `<p>`, lo que causaría hydration errors en Next.js.
-
-12. **`case_annotations` many-to-many:** una annotation puede pertenecer a múltiples casos. Colaboración futura = agregar `case_members` sin refactor.
-
-13. **Jurisprudencias free = session only:** para no saturar la DB con 3,500+ documentos de usuarios no pagos.
-
-14. **`case_annotations` many-to-many:** `unique(case_id, annotation_id)` previene duplicados. FK cascade en `case_id → cases` y `annotation_id → annotations` — borrar caso o annotation limpia case_annotations automáticamente. Colaboración futura: agregar `case_members(case_id, user_id, role)` sin refactorizar nada.
-
-15. **"Guardar en caso" en ParagraphHighlighter:** fetch de casos del usuario vía browser Supabase client (`createClient()`) al primer click — lazy load, cache en-memoria mientras el tooltip está abierto. El dropdown aparece inline dentro del tooltip (no un portal adicional).
-
-16. **Colecciones de leyes (`law_collections`):** 7 colecciones seeded. SELECT público; escritura solo admin. `law_collection_items.law_id` es `uuid` (no integer) porque `laws.id` es UUID. Items actuales: `default` y `derecho-civil` tienen `codigo-civil`; `default` y `derecho-laboral` tienen `codigo-trabajo`. Resto de colecciones sin items hasta cargar contenido. El UI del selector va en Phase 12 (rediseño). Patrón de insert idempotente con `WHERE EXISTS`.
-
-| slug | name | leyes actuales |
-|---|---|---|
-| `default` | Biblioteca completa | codigo-civil, codigo-trabajo |
-| `derecho-civil` | Derecho Civil | codigo-civil |
-| `derecho-penal` | Derecho Penal | — |
-| `derecho-laboral` | Derecho Laboral | codigo-trabajo |
-| `derecho-mercantil` | Derecho Mercantil | — |
-| `derecho-tributario` | Derecho Tributario | — |
-| `derecho-municipal` | Derecho Municipal | — |
-
-18. **Búsqueda full-text:** `articles` y `paragraphs` tienen columna `search_vector tsvector` populada y mantenida vía triggers (`update_article_search_vector`, `update_paragraph_search_vector`). Índices GIN en ambas. La búsqueda usa `plainto_tsquery('spanish', q)` con configuración española. El route handler GET `/api/search` es público; la página `/buscar` es server-side y corre las mismas queries directamente.
-
-19. **Anclas en vista de lectura:** cada `<article>` en `/leyes/[slug]/[section_id]` tiene `id="articulo-[number]"`. Los links desde `/buscar` apuntan a `#articulo-[number]` para scroll directo al artículo.
+1. **`supabase.ts` vs `supabase-server.ts` separados:** obligatorio — `next/headers` rompe Client Components.
+2. **`sections.kind` en español:** `libro/titulo/capitulo`. KIND_LABEL maps usan estas claves.
+3. **Server Actions para mutaciones:** signOut, saveAnnotation, deleteAnnotation, migrateAnnotations, markReformSeen, publishReform, createReformDraft, approveReform, setUserTier.
+4. **Middleware protege `/admin/*`:** doble chequeo con layout. Rol via `user_metadata.role = 'admin'`.
+5. **`public.is_admin()`:** en schema `public`, no `auth` (Supabase no permite CREATE en `auth`).
+6. **`getUserTier(supabase)`:** server-only, recibe cliente existente, verifica expiración.
+7. **Ventana de reformas por tier:** anónimo 7 días, free 1 mes, pro 6 meses.
+8. **`approveReform` ≠ `publishReform`:** approveReform reutiliza reform_id del borrador. publishReform crearía duplicado.
+9. **Tooltip via portal:** `createPortal(…, document.body)` para evitar `<div>` hijo de `<p>` (hydration error).
+10. **`case_annotations` many-to-many:** unique constraint + FK cascade. Colaboración futura = solo agregar `case_members` sin refactor.
+11. **Búsqueda:** `plainto_tsquery('spanish', q)` sobre `tsvector`. Búsqueda en articles y paragraphs en paralelo, deduplicada por article_id. IDs en response son strings (UUID), no numbers.
+12. **Content Extractor:** proyecto separado en claude.ai genera SQL idempotente (`ON CONFLICT DO NOTHING`) desde cualquier formato. Nunca hardcodea IDs.
+13. **Jurisprudencias free = session only:** no saturar DB con 3,500+ docs de usuarios no pagos.
+14. **"Guardar en caso":** lazy fetch de casos al primer click en tooltip. Cache en-memoria mientras tooltip abierto.
+15. **Modos de navegación — colecciones curadas:** `law_collections` + `law_collection_items` con RLS pública. `law_id` es UUID (no integer) — consistente con `laws.id` en el schema real. Los modos de caso se derivan en runtime desde `case_annotations`, sin tabla adicional. El modo activo se guarda en localStorage en el cliente.
