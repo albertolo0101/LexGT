@@ -1,4 +1,4 @@
-import { createServerSupabaseClient } from "@/lib/supabase";
+import { createServerSupabaseClient } from "@/lib/supabase-server";
 import Link from "next/link";
 import type { Metadata } from "next";
 import type { Law } from "@/lib/types";
@@ -20,17 +20,6 @@ export default async function LeyesPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <header className="border-b border-gray-100">
-        <div className="max-w-3xl mx-auto px-6 py-6">
-          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">
-            LexGT
-          </h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            Legislación de Guatemala
-          </p>
-        </div>
-      </header>
-
       <main className="max-w-3xl mx-auto px-6 py-10">
         <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-6">
           Leyes disponibles
