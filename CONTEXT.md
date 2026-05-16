@@ -114,7 +114,7 @@ saved_jurisprudences: id, user_id, source ('CC'|'CSJ'), external_id, title, full
 
 ### Funciones PostgreSQL
 
-- `auth.is_admin()` — verifica `auth.jwt()->'user_metadata'->>'role' = 'admin'`. Usada en RLS.
+- `public.is_admin()` — verifica `auth.jwt()->'user_metadata'->>'role' = 'admin'`. Usada en RLS. (Originalmente escrita como `auth.is_admin()` pero Supabase SQL Editor no permite crear funciones en el schema `auth`.)
 - `public.handle_new_user()` — trigger `security definer` que crea fila en `user_profiles` al registrarse.
 - `public.admin_find_user_by_email(email)` — `security definer`, verifica admin, retorna `uuid` del usuario. Permite al panel admin buscar usuarios sin service role key.
 
@@ -335,7 +335,7 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<publishable key>
 
 4. **Middleware protege `/admin/*`:** doble chequeo — middleware redirige, layout también verifica. El rol admin se setea via Supabase dashboard en `user_metadata.role = 'admin'`.
 
-5. **`auth.is_admin()`:** función PostgreSQL que inspecciona el JWT para RLS. Usada en las policies de `law_reforms`, `reform_draft_articles` y `user_profiles`.
+5. **`public.is_admin()`:** función PostgreSQL que inspecciona el JWT para RLS. Usada en las policies de `law_reforms`, `reform_draft_articles` y `user_profiles`. Definida en `public` (no `auth`) porque Supabase SQL Editor no permite CREATE en el schema `auth`.
 
 6. **`admin_find_user_by_email()`:** función `security definer` que permite al admin buscar usuarios en `auth.users` sin necesitar la service role key. Verifica internamente que el llamador sea admin.
 

@@ -1,7 +1,8 @@
 -- 0003_reform_status.sql
 
--- Helper function used by RLS policies below
-create or replace function auth.is_admin()
+-- Helper function used by RLS policies below.
+-- Defined in public schema (auth schema is restricted in Supabase SQL Editor).
+create or replace function public.is_admin()
 returns boolean
 language sql
 stable
@@ -25,11 +26,11 @@ alter table law_reforms
 -- Admins can insert and update (public select already exists from 0002)
 create policy "admin insert law_reforms"
   on law_reforms for insert
-  with check (auth.is_admin());
+  with check (public.is_admin());
 
 create policy "admin update law_reforms"
   on law_reforms for update
-  using (auth.is_admin());
+  using (public.is_admin());
 
 -- ============================================================
 -- REFORM DRAFT ARTICLES
@@ -47,18 +48,18 @@ alter table reform_draft_articles enable row level security;
 
 create policy "admin select reform_draft_articles"
   on reform_draft_articles for select
-  using (auth.is_admin());
+  using (public.is_admin());
 
 create policy "admin insert reform_draft_articles"
   on reform_draft_articles for insert
-  with check (auth.is_admin());
+  with check (public.is_admin());
 
 create policy "admin update reform_draft_articles"
   on reform_draft_articles for update
-  using (auth.is_admin());
+  using (public.is_admin());
 
 create policy "admin delete reform_draft_articles"
   on reform_draft_articles for delete
-  using (auth.is_admin());
+  using (public.is_admin());
 
 create index on reform_draft_articles (reform_id);

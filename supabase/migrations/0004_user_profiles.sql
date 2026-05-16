@@ -26,11 +26,11 @@ create policy "owner update user_profiles"
 -- Admins can insert and update any profile (for setUserTier)
 create policy "admin insert user_profiles"
   on user_profiles for insert
-  with check (auth.is_admin());
+  with check (public.is_admin());
 
 create policy "admin update user_profiles"
   on user_profiles for update
-  using (auth.is_admin());
+  using (public.is_admin());
 
 -- ============================================================
 -- TRIGGER: auto-create profile on signup
