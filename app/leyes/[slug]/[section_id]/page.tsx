@@ -2,7 +2,8 @@ import { createServerSupabaseClient } from "@/lib/supabase-server";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import type { Law, Section, ArticleWithParagraphs } from "@/lib/types";
+import type { Annotation, Law, Section, ArticleWithParagraphs } from "@/lib/types";
+import ParagraphHighlighter from "@/components/ParagraphHighlighter";
 
 type Props = { params: Promise<{ slug: string; section_id: string }> };
 
@@ -33,6 +34,7 @@ export default async function SectionReadingPage({ params }: Props) {
     { data: lawRow },
     { data: sectionRow },
     { data: articlesRaw, error: articlesError },
+    { data: { user } },
   ] = await Promise.all([
     supabase.from("laws").select("*").eq("slug", slug).single(),
     supabase.from("sections").select("*").eq("id", section_id).single(),
@@ -42,6 +44,7 @@ export default async function SectionReadingPage({ params }: Props) {
       .eq("section_id", section_id)
       .eq("is_current", true)
       .order("position"),
+    supabase.auth.getUser(),
   ]);
 
   const law = lawRow as Law | null;
@@ -55,6 +58,20 @@ export default async function SectionReadingPage({ params }: Props) {
       ...a,
       paragraphs: [...a.paragraphs].sort((x, y) => x.position - y.position),
     })
+  );
+
+  const articleIds = articles.map((a) => a.id);
+  const annotations: Annotation[] =
+    user && articleIds.length > 0
+      ? (((await supabase.from("annotations").select("*").in("article_id", articleIds)).data ?? []) as Annotation[])
+      : [];
+
+  const annotationsByParagraph = annotations.reduce<Record<string, Annotation[]>>(
+    (acc, ann) => {
+      (acc[ann.paragraph_id] ??= []).push(ann);
+      return acc;
+    },
+    {}
   );
 
   const kindLabel = KIND_LABEL[section.kind] ?? section.kind;
@@ -116,7 +133,13 @@ export default async function SectionReadingPage({ params }: Props) {
                       key={para.id}
                       className="text-[15px] leading-relaxed text-gray-800"
                     >
-                      {para.text}
+                      <ParagraphHighlighter
+                        text={para.text}
+                        annotations={annotationsByParagraph[para.id] ?? []}
+                        paragraphId={para.id}
+                        articleId={article.id}
+                        isAuthenticated={!!user}
+                      />
                     </p>
                   ))}
                 </div>

@@ -45,3 +45,17 @@ export type Paragraph = {
 export type ArticleWithParagraphs = Article & { paragraphs: Paragraph[] }
 
 export type SectionNode = Section & { children: SectionNode[] }
+
+export type Annotation = {
+  id: string
+  user_id: string
+  paragraph_id: string
+  article_id: string
+  color: string
+  char_start: number
+  char_end: number
+  note: string | null
+  is_pinned_to_old_version: boolean
+  created_at: string
+  updated_at: string
+}
