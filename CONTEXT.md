@@ -1,6 +1,6 @@
 # LexGT — Contexto del proyecto
 
-Última actualización: 2026-05-16 (Phase 9 completa, Phase 10 en progreso)
+Última actualización: 2026-05-18 (Phase 9 completa, Phase 10 en progreso — 15 leyes cargadas)
 
 ---
 
@@ -47,20 +47,20 @@ Leyenda: ✅ en DB y seeded | ⚠️ placeholder (reemplazar) | ⏳ pendiente
 
 | # | Ley | En DB | SQL listo |
 |---|---|---|---|
-| 1 | Constitución Política + Ley de Orden Público + Ley de Emisión del Pensamiento | ⏳ | ⏳ |
-| 2 | Ley de Amparo, Exhibición Personal y de Constitucionalidad | ⏳ | ⏳ |
-| 3 | Ley Electoral y de Partidos Políticos | ⏳ | ⏳ |
-| 4 | Ley del Organismo Judicial | ⏳ | ⏳ |
-| 5 | Ley del Organismo Legislativo | ⏳ | ⏳ |
+| 1 | Constitución Política + Ley de Orden Público + Ley de Emisión del Pensamiento | ✅ | ✅ |
+| 2 | Ley de Amparo, Exhibición Personal y de Constitucionalidad | ✅ | ✅ |
+| 3 | Ley Electoral y de Partidos Políticos | ✅ | ✅ |
+| 4 | Ley del Organismo Judicial | ✅ | ✅ |
+| 5 | Ley del Organismo Legislativo | ✅ | ✅ |
 | 6 | Ley del Organismo Ejecutivo | ⏳ | ⏳ |
 | 7 | Código Civil | ✅ | ✅ |
-| 8 | Código Procesal Civil y Mercantil + Leyes Anexas | ⏳ | ⏳ |
-| 9 | Código de Comercio + Leyes Anexas | ⏳ | ⏳ |
+| 8 | Código Procesal Civil y Mercantil + Leyes Anexas | ✅ | ✅ |
+| 9 | Código de Comercio + Leyes Anexas | ✅ | ✅ |
 | 10 | Código de Notariado + Leyes Anexas | ⏳ | ⏳ |
-| 11 | Ley de lo Contencioso Administrativo + Leyes Anexas | ⏳ | ⏳ |
-| 12 | Código Penal + Leyes Anexas | ⏳ | ⏳ |
+| 11 | Ley de lo Contencioso Administrativo + Leyes Anexas | ✅ | ✅ |
+| 12 | Código Penal + Leyes Anexas | ✅ | ✅ |
 | 13 | Código Procesal Penal + Leyes Anexas | ⏳ | ⏳ |
-| 14 | Código de Trabajo + Leyes Anexas | ⏳ | ⚠️ placeholder |
+| 14 | Código de Trabajo + Leyes Anexas | ✅ | ✅ |
 
 ### Leyes Civiles (20)
 
@@ -69,7 +69,7 @@ Leyenda: ✅ en DB y seeded | ⚠️ placeholder (reemplazar) | ⏳ pendiente
 | 15 | Ley de Adopciones | ⏳ | ⏳ |
 | 16 | Procedimiento Relativo al Hallazgo de Bienes Mostrencos | ⏳ | ⏳ |
 | 17 | Ley General de Caza | ⏳ | ⏳ |
-| 18 | Ley de Garantías Mobiliarias | ⏳ | ⏳ |
+| 18 | Ley de Garantías Mobiliarias | ✅ | ✅ |
 | 19 | Ley de Inquilinato | ⏳ | ⏳ |
 | 20 | Ley de Nacionalidad | ⏳ | ⏳ |
 | 21 | Ley Reguladora de las Áreas de Reservas Territoriales del Estado (OCRET) | ⏳ | ⏳ |
@@ -199,9 +199,10 @@ Leyenda: ✅ en DB y seeded | ⚠️ placeholder (reemplazar) | ⏳ pendiente
 | 120 | Ley de Servicio Civil del Organismo Legislativo | ⏳ | ⏳ |
 | 121 | Ley de Sindicalización y Regulación de la Huelga de los Trabajadores del Estado | ⏳ | ⏳ |
 
-**Progreso: 1/121 en DB ✅ — 0/121 placeholder ⚠️ — 120/121 pendientes ⏳**
+**Progreso: 13/121 ítems en DB ✅ — 108/121 pendientes ⏳**
+_(Nota: ítem #1 son 3 leyes separadas. Además se cargó Ley General de Electricidad fuera del checklist de 121.)_
 
-**Flujo de carga de contenido:** proyecto separado "LexGT Content Extractor" en claude.ai procesa documentos (PDF, Word, texto) y genera SQL compatible con el schema. Output: un bloque SQL por ley, idempotente (`ON CONFLICT DO NOTHING`), listo para Supabase SQL Editor.
+**Flujo de carga de contenido:** proyecto separado "LexGT Content Extractor" (`PDFtoSQLapp/pdf-sql-LEX/lex-extractor`) procesa documentos (PDF, Word, texto) y genera SQL compatible con el schema. Ver `SCHEMA_CONTEXT.md` en ese repo para los fixes pendientes al extractor. Output: un bloque SQL por ley, idempotente (`ON CONFLICT DO NOTHING`), ejecutado vía psql.
 
 ---
 
@@ -228,8 +229,8 @@ Las credenciales están en `.env.local` (no commiteado, en gitignore).
 
 | Tabla | Notas |
 |---|---|
-| `laws` | 1 fila real: Código Civil. Código de Trabajo pendiente de cargar con contenido real. |
-| `sections` | Jerarquía: libro → titulo → capitulo. `kind` en español. |
+| `laws` | 15 leyes reales cargadas (ver checklist). Columna clave: `slug` (único), `is_active`. |
+| `sections` | Jerarquía: libro → titulo → capitulo → seccion → parte → parrafo → subseccion → articulo → disposiciones. Columna `heading` (no `title`). |
 | `articles` | Versioning: `version_number`, `superseded_at`, `previous_version_id`, `reform_id`. `search_vector` indexado. |
 | `paragraphs` | Texto por artículo, ordenado por `position`. `search_vector` indexado. |
 | `annotations` | Owner CRUD. `is_pinned_to_old_version` para annotations migradas. |
@@ -502,7 +503,7 @@ Panel protegido. Gestión de reformas (crear/revisar/publicar) y tiers de usuari
 - ✓ Phase 7: Pro tier (user_profiles + multi-color highlights + notes)
 - ✓ Phase 8: Casos (Pro)
 - ✓ Phase 9: Búsqueda full-text (tsvector + GIN + /buscar + header search)
-- ⏳ Phase 10: Contenido — 121 leyes (ver checklist arriba). SQL generándose en "LexGT Content Extractor"
+- ◑ Phase 10: Contenido — 13/121 ítems cargados (15 leyes). Extractor necesita fixes (ver SCHEMA_CONTEXT.md en lex-extractor)
 - [ ] Phase 11: Web polish + rediseño completo (mock listo en Claude Design, auditoría completa)
           Incluye: nuevo layout, sidebar con modos de navegación, panel derecho, ⌘K, landing page
           Requiere: 0008_collections.sql ✓ ya aplicado
@@ -515,7 +516,7 @@ Panel protegido. Gestión de reformas (crear/revisar/publicar) y tiers de usuari
 
 ## Lo que falta construir
 
-- **Phase 10:** aplicar SQL de 121 leyes desde "LexGT Content Extractor". Ver checklist de contenido. El archivo `supabase/seeds/codigo_trabajo.sql` es placeholder — reemplazar con el real cuando esté listo.
+- **Phase 10:** 13/121 ítems cargados. Continuar con el extractor una vez aplicados los fixes en `SCHEMA_CONTEXT.md` (5 bugs de schema documentados). El archivo `supabase/seeds/codigo_trabajo.sql` era placeholder — ya reemplazado con contenido real.
 - **Phase 11:** rediseño visual completo. Incluye selector de modos de navegación en sidebar. `0008_collections.sql` ya está aplicado — Phase 11 puede arrancar en cualquier momento.
 - **Phase 12:** deploy en Vercel. Dominio cuando haya usuarios reales.
 - **Phase 13:** jurisprudencias — Railway + Playwright para scraping CC/CSJ (ASP.NET WebForms con `__VIEWSTATE`, requiere browser headless).
@@ -530,7 +531,7 @@ Panel protegido. Gestión de reformas (crear/revisar/publicar) y tiers de usuari
 ## Decisiones técnicas relevantes
 
 1. **`supabase.ts` vs `supabase-server.ts` separados:** obligatorio — `next/headers` rompe Client Components.
-2. **`sections.kind` en español:** `libro/titulo/capitulo`. KIND_LABEL maps usan estas claves.
+2. **`sections.kind` en español:** `libro/titulo/capitulo/seccion/parte/parrafo/subseccion/articulo/disposiciones`. La columna es `heading` (no `title`). KIND_LABEL maps usan estas claves.
 3. **Server Actions para mutaciones:** signOut, saveAnnotation, deleteAnnotation, migrateAnnotations, markReformSeen, publishReform, createReformDraft, approveReform, setUserTier.
 4. **Middleware protege `/admin/*`:** doble chequeo con layout. Rol via `user_metadata.role = 'admin'`.
 5. **`public.is_admin()`:** en schema `public`, no `auth` (Supabase no permite CREATE en `auth`).
