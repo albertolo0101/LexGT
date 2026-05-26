@@ -56,7 +56,7 @@ export default async function CaseDetailPage({ params }: Props) {
 
   if (!theCase) notFound();
 
-  const caseAnnotations = (theCase.case_annotations ?? []) as CaseAnnotationRow[];
+  const caseAnnotations = (theCase.case_annotations ?? []) as unknown as CaseAnnotationRow[];
 
   const deleteCaseAction = deleteCase.bind(null, theCase.id);
 

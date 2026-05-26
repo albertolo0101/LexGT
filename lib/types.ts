@@ -13,7 +13,7 @@ export type Section = {
   id: string
   law_id: string
   parent_id: string | null
-  kind: 'libro' | 'titulo' | 'capitulo' | 'seccion' | 'parte'
+  kind: 'libro' | 'titulo' | 'capitulo' | 'seccion' | 'parte' | 'parrafo' | 'subseccion' | 'articulo' | 'disposiciones'
   number: string | null
   heading: string
   position: number
