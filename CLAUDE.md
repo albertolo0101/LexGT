@@ -8,25 +8,38 @@ LexGT es una biblioteca legal guatemalteca: los usuarios navegan y leen legislac
 
 ## Current Goal
 
-**Phase 11 — Web polish + rediseño completo** (en progreso)
+**Remediation plan — `LEXGT_EXECUTION_PLAN.md`** (en progreso, una fase por sesión)
 
-- ✓ Tokens de diseño (navy/gold/paper/ink/hl, Source Serif 4 + Geist) en `globals.css`/`layout.tsx`
-- ✓ Helpers compartidos: `lib/case-colors.ts`, `components/icons.tsx`, `lib/get-pending-reforms.ts`, `lib/get-article-counts.ts`, `lib/section-kind.ts`
-- ✓ AppShell/ShellClient/TopBar/SidebarContent rediseñados (TopBar navy sticky 62px, sidebar 260px con NAVEGAR/BIBLIOTECA/MIS CASOS)
-- ✓ `SearchOverlay` (⌘K, fetch a `/api/search`) y `PaywallModal` (comparación Free/Pro)
-- ✓ `/leyes` rediseñado: hero + reformas recientes + catálogo grid/list (`LeyesIndexClient`, `LawCard` restyled, lógica de migración de reformas preservada)
-- ✓ Lector `/leyes/[slug]/[section_id]` rediseñado: `DocHeader`, `ChapterRail`, `Article`, `SectionNav`, `RightPanel` (tabs Notas/Historial reales, Caso/Concordancias stub), `NotifBanner`
-- ✓ Popover de highlight en `ParagraphHighlighter` restyled (navy/gold, `HL_TOKENS`)
-- [ ] Verificación visual en navegador (pendiente — sandbox sin acceso a Supabase para `npm run dev`)
-- [ ] Páginas fuera de alcance (marcadas "PRÓXIMO TURNO" en el bundle de diseño): `/leyes/[slug]` (TOC), `/buscar`, `/casos`, `/casos/[id]`, `/reforma/[id]`
+Phase 11 (rediseño completo) está commiteado y `npm run build --turbopack` pasa.
+Antes de Phase 12 (deploy), se ejecuta `LEXGT_EXECUTION_PLAN.md`:
 
-Fases siguientes: Phase 12 (deploy Vercel), Phase 13 (jurisprudencias — Railway + Playwright), Phase 14 (pagos Visanet), Phase 15 (React Native).
+- ✓ **Phase 0 — Baseline & hygiene**: `0009_schema_reconciliation.sql` (sections.kind
+  ampliado a 9 valores + 8 índices duplicados eliminados), `supabase/SCHEMA_SNAPSHOT.md`
+  generado, `components/Header.tsx` eliminado (sin imports), depcheck limpio,
+  secrets hygiene en lex-extractor verificado (sin hallazgos).
+- [ ] **Phase 1 — Security patching (P0, bloquea deploy)**: mover admin a
+  `app_metadata` (E1 — afecta también `admin_find_user_by_email`, no solo `is_admin()`),
+  bloquear self-update de `user_profiles.tier` (E2), `current_user_tier()`/`is_pro()`
+  + WITH CHECK en annotations/cases (E3), `docs/SECURITY.md`.
+- [ ] Phases 2-7 (authz unification, service layer, API v1, anchoring v2, testing/CI,
+  module architecture) — ver `LEXGT_EXECUTION_PLAN.md`.
+
+Fases del roadmap original siguen después: Phase 12 (deploy Vercel), Phase 13
+(jurisprudencias — Railway + Playwright), Phase 14 (pagos Visanet), Phase 15 (React Native).
 
 ---
 
 ## Last Session
 
-Implementado el rediseño completo de Phase 11 a partir de un bundle de Claude Design (`LexGT.html`). `npm run build --turbopack` pasa sin errores de tipos. Falta verificación visual manual en `npm run dev` (este entorno no resuelve el dominio de Supabase, así que no se pudo probar contra datos reales).
+Phase 11 (rediseño) commiteado. Ejecutado Phase 0 de `LEXGT_EXECUTION_PLAN.md`:
+reconciliación de schema (`0009_schema_reconciliation.sql` aplicado a prod vía
+Supabase MCP — `sections.kind` ahora acepta los 9 valores usados por el
+extractor/`lib/types.ts`, eliminados 8 índices duplicados de un 0001 re-aplicado),
+`supabase/SCHEMA_SNAPSHOT.md` documenta el schema completo y los gaps E1/E2/E3 de
+seguridad. `components/Header.tsx` eliminado (sin referencias). `npm run build --turbopack`
+pasa. Próxima sesión: Phase 1 (security patching) — empezar por Step 1.1
+(`is_admin()` + `admin_find_user_by_email()` → `app_metadata`, requiere acción manual
+de Beto en el dashboard).
 
 ---
 
