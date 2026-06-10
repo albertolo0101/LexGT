@@ -76,7 +76,7 @@ export async function GET(req: NextRequest) {
   if (lawId) articleQuery = articleQuery.eq('law_id', lawId)
 
   // Build paragraph query — fetch extra to account for JS-side filtering
-  let paragraphQuery = supabase
+  const paragraphQuery = supabase
     .from('paragraphs')
     .select('text, article_id, articles(id, number, heading, section_id, law_id, is_current, laws(slug, short_name))')
     .textSearch('search_vector', q, { type: 'plain', config: 'spanish' })

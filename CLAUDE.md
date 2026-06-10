@@ -10,12 +10,15 @@ LexGT es una biblioteca legal guatemalteca: los usuarios navegan y leen legislac
 
 **Phase 11 — Web polish + rediseño completo** (en progreso)
 
-- ✓ AppShell implementado: header centrado + sidebar 260px (collapsible mobile) + right panel slot 320px
-- ✓ SidebarContent: lista de leyes activas, Jurisprudencias (badge "Próximamente"), link /casos (auth-only)
-- ✓ `Section.kind` ampliado a 9 valores
-- [ ] Selector de modos en sidebar (siguiente paso)
-- [ ] Contenido del panel derecho (Notas / Caso / Concordancias / Historial)
-- [ ] ⌘K, landing page, rediseño páginas internas
+- ✓ Tokens de diseño (navy/gold/paper/ink/hl, Source Serif 4 + Geist) en `globals.css`/`layout.tsx`
+- ✓ Helpers compartidos: `lib/case-colors.ts`, `components/icons.tsx`, `lib/get-pending-reforms.ts`, `lib/get-article-counts.ts`, `lib/section-kind.ts`
+- ✓ AppShell/ShellClient/TopBar/SidebarContent rediseñados (TopBar navy sticky 62px, sidebar 260px con NAVEGAR/BIBLIOTECA/MIS CASOS)
+- ✓ `SearchOverlay` (⌘K, fetch a `/api/search`) y `PaywallModal` (comparación Free/Pro)
+- ✓ `/leyes` rediseñado: hero + reformas recientes + catálogo grid/list (`LeyesIndexClient`, `LawCard` restyled, lógica de migración de reformas preservada)
+- ✓ Lector `/leyes/[slug]/[section_id]` rediseñado: `DocHeader`, `ChapterRail`, `Article`, `SectionNav`, `RightPanel` (tabs Notas/Historial reales, Caso/Concordancias stub), `NotifBanner`
+- ✓ Popover de highlight en `ParagraphHighlighter` restyled (navy/gold, `HL_TOKENS`)
+- [ ] Verificación visual en navegador (pendiente — sandbox sin acceso a Supabase para `npm run dev`)
+- [ ] Páginas fuera de alcance (marcadas "PRÓXIMO TURNO" en el bundle de diseño): `/leyes/[slug]` (TOC), `/buscar`, `/casos`, `/casos/[id]`, `/reforma/[id]`
 
 Fases siguientes: Phase 12 (deploy Vercel), Phase 13 (jurisprudencias — Railway + Playwright), Phase 14 (pagos Visanet), Phase 15 (React Native).
 
@@ -23,7 +26,7 @@ Fases siguientes: Phase 12 (deploy Vercel), Phase 13 (jurisprudencias — Railwa
 
 ## Last Session
 
-Not yet recorded.
+Implementado el rediseño completo de Phase 11 a partir de un bundle de Claude Design (`LexGT.html`). `npm run build --turbopack` pasa sin errores de tipos. Falta verificación visual manual en `npm run dev` (este entorno no resuelve el dominio de Supabase, así que no se pudo probar contra datos reales).
 
 ---
 

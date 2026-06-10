@@ -7,6 +7,7 @@ import type { Annotation, Tier } from "@/lib/types";
 import { saveAnnotation, deleteAnnotation, updateAnnotationNote } from "@/app/leyes/actions";
 import { addAnnotationToCase } from "@/app/casos/actions";
 import { createClient } from "@/lib/supabase";
+import { HL_TOKENS } from "@/lib/case-colors";
 
 type AnnotationColor = 'yellow' | 'green' | 'blue' | 'pink';
 
@@ -15,13 +16,6 @@ const COLOR_BG: Record<AnnotationColor, string> = {
   green:  'bg-green-200',
   blue:   'bg-blue-200',
   pink:   'bg-pink-200',
-};
-
-const COLOR_CIRCLE: Record<AnnotationColor, string> = {
-  yellow: 'bg-yellow-300',
-  green:  'bg-green-300',
-  blue:   'bg-blue-300',
-  pink:   'bg-pink-300',
 };
 
 const COLORS: AnnotationColor[] = ['yellow', 'green', 'blue', 'pink'];
@@ -206,29 +200,32 @@ export default function ParagraphHighlighter({
             style={{ left: tooltip.x, top: tooltip.y }}
           >
             {tooltip.kind === "new" ? (
-              <div className="bg-gray-900 rounded shadow-lg p-2 flex flex-col gap-2">
-                {tier === 'pro' && (
-                  <div className="flex gap-1.5 justify-center">
-                    {COLORS.map((c) => (
-                      <button
-                        key={c}
-                        onClick={() => setSelectedColor(c)}
-                        className={`w-5 h-5 rounded-full ${COLOR_CIRCLE[c]} transition-all ${selectedColor === c ? 'ring-2 ring-white ring-offset-1 ring-offset-gray-900' : ''}`}
-                        aria-label={c}
-                      />
-                    ))}
-                  </div>
-                )}
+              <div className="bg-navy-900 text-white rounded-lg shadow-xl px-3 py-2 flex items-center gap-3">
+                <div className="flex items-center gap-1.5">
+                  {(tier === 'pro' ? COLORS : (['yellow'] as AnnotationColor[])).map((c) => (
+                    <button
+                      key={c}
+                      onClick={() => setSelectedColor(c)}
+                      className={`w-4 h-4 rounded-full transition-all ${selectedColor === c ? 'ring-2 ring-gold-400 ring-offset-1 ring-offset-navy-900' : ''}`}
+                      style={{ backgroundColor: HL_TOKENS[c].swatch }}
+                      aria-label={HL_TOKENS[c].label}
+                    />
+                  ))}
+                  {tier !== 'pro' && (
+                    <span className="text-[10px] text-navy-100/60 ml-1 whitespace-nowrap">+3 en Pro</span>
+                  )}
+                </div>
+                <div className="w-px h-4 bg-white/15" />
                 <button
                   onClick={handleSave}
                   disabled={pending}
-                  className="text-white text-xs px-3 py-1 rounded hover:bg-gray-700 disabled:opacity-50 transition-colors whitespace-nowrap"
+                  className="text-xs font-semibold text-navy-900 bg-gold-400 hover:bg-gold-500 disabled:opacity-50 transition-colors rounded-full px-3 py-1 whitespace-nowrap"
                 >
                   {pending ? "…" : "Destacar"}
                 </button>
               </div>
             ) : (
-              <div className="bg-gray-900 rounded shadow-lg p-2 flex flex-col gap-2 min-w-[180px]">
+              <div className="bg-navy-900 text-white rounded-lg shadow-xl p-2 flex flex-col gap-2 min-w-[180px]">
                 {tier === 'pro' && (
                   <>
                     <textarea
@@ -236,12 +233,12 @@ export default function ParagraphHighlighter({
                       onChange={(e) => setNoteText(e.target.value)}
                       placeholder="Agregar nota…"
                       rows={3}
-                      className="w-full text-xs bg-gray-800 text-white rounded p-1.5 resize-none placeholder-gray-500 focus:outline-none"
+                      className="w-full text-xs bg-white/10 text-white rounded p-1.5 resize-none placeholder-navy-100/50 focus:outline-none"
                     />
                     <button
                       onClick={handleSaveNote}
                       disabled={pending}
-                      className="text-white text-xs px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-50 transition-colors"
+                      className="text-xs font-semibold text-navy-900 bg-gold-400 hover:bg-gold-500 disabled:opacity-50 transition-colors rounded-full px-3 py-1"
                     >
                       {pending ? "…" : "Guardar nota"}
                     </button>
@@ -249,24 +246,24 @@ export default function ParagraphHighlighter({
                     <button
                       onClick={handleToggleCases}
                       disabled={pending}
-                      className="text-white text-xs px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-50 transition-colors text-left flex items-center justify-between"
+                      className="text-white text-xs px-3 py-1 rounded bg-white/10 hover:bg-white/15 disabled:opacity-50 transition-colors text-left flex items-center justify-between"
                     >
                       <span>Guardar en caso</span>
                       <span className="ml-2 opacity-60">{casesOpen ? "▴" : "▾"}</span>
                     </button>
 
                     {casesOpen && (
-                      <div className="bg-gray-800 rounded overflow-hidden">
+                      <div className="bg-white/10 rounded overflow-hidden">
                         {casesLoading ? (
-                          <p className="text-xs text-gray-400 px-3 py-2">Cargando…</p>
+                          <p className="text-xs text-navy-100/60 px-3 py-2">Cargando…</p>
                         ) : !userCases || userCases.length === 0 ? (
-                          <p className="text-xs text-gray-400 px-3 py-2">No tienes casos</p>
+                          <p className="text-xs text-navy-100/60 px-3 py-2">No tienes casos</p>
                         ) : (
                           userCases.map((c) => (
                             <button
                               key={c.id}
                               onClick={() => handleAddToCase(c.id)}
-                              className="w-full text-left text-xs text-white px-3 py-2 hover:bg-gray-700 transition-colors"
+                              className="w-full text-left text-xs text-white px-3 py-2 hover:bg-white/10 transition-colors"
                             >
                               {c.title}
                             </button>
