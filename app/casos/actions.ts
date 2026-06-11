@@ -3,16 +3,10 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
-import { getActor, requirePro } from "@/lib/authz";
+import { getActor } from "@/lib/authz";
 import { runAction, type ActionResult } from "@/lib/action-result";
+import * as casesService from "@/lib/services/cases";
 import type { Case } from "@/lib/types";
-
-async function requireProActor() {
-  const supabase = await createServerSupabaseClient();
-  const actor = await getActor(supabase);
-  requirePro(actor);
-  return { supabase, userId: actor.userId };
-}
 
 export async function createCase(data: {
   title: string;
@@ -20,57 +14,37 @@ export async function createCase(data: {
   color?: string;
 }): Promise<ActionResult<Case>> {
   return runAction(async () => {
-    const { supabase, userId } = await requireProActor();
-
-    const { data: newCase, error } = await supabase
-      .from("cases")
-      .insert({
-        user_id: userId,
-        title: data.title,
-        description: data.description ?? null,
-        color: data.color ?? "gray",
-      })
-      .select("*")
-      .single();
-    if (error) throw error;
+    const supabase = await createServerSupabaseClient();
+    const actor = await getActor(supabase);
+    const input = casesService.CreateCaseInput.parse(data);
+    const newCase = await casesService.createCase(supabase, actor, input);
 
     revalidatePath("/casos");
-    return newCase as Case;
+    return newCase;
   });
 }
 
 export async function deleteCase(caseId: string): Promise<ActionResult<void>> {
   const result = await runAction(async () => {
-    const { supabase, userId } = await requireProActor();
-
-    const { error } = await supabase
-      .from("cases")
-      .delete()
-      .eq("id", caseId)
-      .eq("user_id", userId);
-    if (error) throw error;
+    const supabase = await createServerSupabaseClient();
+    const actor = await getActor(supabase);
+    const input = casesService.DeleteCaseInput.parse({ caseId });
+    await casesService.deleteCase(supabase, actor, input);
   });
 
   if (result.ok) redirect("/casos");
   return result;
 }
 
-export async function addAnnotationToCase({
-  caseId,
-  annotationId,
-}: {
+export async function addAnnotationToCase(data: {
   caseId: string;
   annotationId: string;
 }): Promise<ActionResult<void>> {
   return runAction(async () => {
-    const { supabase } = await requireProActor();
-
-    const { error } = await supabase
-      .from("case_annotations")
-      .insert({ case_id: caseId, annotation_id: annotationId });
-
-    // unique constraint violation means it's already there — not an error
-    if (error && !error.message.includes("duplicate")) throw error;
+    const supabase = await createServerSupabaseClient();
+    const actor = await getActor(supabase);
+    const input = casesService.AddAnnotationToCaseInput.parse(data);
+    await casesService.addAnnotationToCase(supabase, actor, input);
 
     revalidatePath("/casos");
   });
@@ -78,13 +52,10 @@ export async function addAnnotationToCase({
 
 export async function removeAnnotationFromCase(caseAnnotationId: string): Promise<ActionResult<void>> {
   return runAction(async () => {
-    const { supabase } = await requireProActor();
-
-    const { error } = await supabase
-      .from("case_annotations")
-      .delete()
-      .eq("id", caseAnnotationId);
-    if (error) throw error;
+    const supabase = await createServerSupabaseClient();
+    const actor = await getActor(supabase);
+    const input = casesService.RemoveAnnotationFromCaseInput.parse({ caseAnnotationId });
+    await casesService.removeAnnotationFromCase(supabase, actor, input);
 
     revalidatePath("/casos");
   });

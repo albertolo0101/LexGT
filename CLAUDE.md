@@ -28,8 +28,18 @@ Antes de Phase 12 (deploy), se ejecuta `LEXGT_EXECUTION_PLAN.md`:
   `lib/action-result.ts` (`ActionResult<T>`/`runAction`/`ActionError`).
   Las tres `actions.ts` (leyes, casos, admin) y sus consumidores cliente
   reescritos para devolver `ActionResult` en vez de `throw new Error`.
-- [ ] Phases 3-7 (service layer, API v1, anchoring v2, testing/CI,
-  module architecture) — ver `LEXGT_EXECUTION_PLAN.md`.
+- ▸ **Phase 3 — Service layer extraction** (en progreso):
+  - ✓ Step 3.1 — `lib/services/annotations.ts` (saveAnnotation,
+    updateAnnotationNote, deleteAnnotation, migrateAnnotations,
+    markReformSeen) con schemas Zod + Vitest.
+  - ✓ Step 3.2 — `lib/services/cases.ts`, `lib/services/reforms.ts`
+    (publishReform, createReformDraft, approveReform — comparten
+    `supersedeArticle`), `lib/services/admin.ts` (findArticle,
+    setUserTier). `app/leyes/actions.ts`, `app/casos/actions.ts`,
+    `app/admin/actions.ts` son wrappers delgados.
+  - [ ] Step 3.3 — read-path query modules (`lib/services/queries/`).
+- [ ] Phases 4-7 (API v1, anchoring v2, testing/CI, module architecture)
+  — ver `LEXGT_EXECUTION_PLAN.md`.
 
 Fases del roadmap original siguen después: Phase 12 (deploy Vercel), Phase 13
 (jurisprudencias — Railway + Playwright), Phase 14 (pagos Visanet), Phase 15 (React Native).
@@ -56,57 +66,42 @@ Ver `docs/SECURITY.md` para la matriz completa tabla × operación × política 
 
 ## Last Session
 
-Ejecutado Phase 2 de `LEXGT_EXECUTION_PLAN.md` (los tres pasos completos).
+Ejecutado Phase 3, Steps 3.1 y 3.2 de `LEXGT_EXECUTION_PLAN.md` (Step 3.3
+queda pendiente).
 
-- **Step 2.1**: `lib/types.ts` define `Tier = 'anonymous'|'free'|'pro'` y
-  `AuthedTier = Exclude<Tier, 'anonymous'>`. `getUserTier()` ahora devuelve
-  `'anonymous'` (antes `'free'`) cuando no hay usuario. Eliminado el tipo
-  `UserTier` duplicado de `lib/get-pending-reforms.ts` y los `EffectiveTier`/
-  `Tier` locales en `ShellClient.tsx`, `LeyesIndexClient.tsx`, `LawCard.tsx`,
-  `AppShell.tsx`, `app/leyes/page.tsx`, `app/leyes/[slug]/[section_id]/page.tsx`.
-- **Step 2.2**: nuevo `lib/authz.ts` — `Actor`, `getActor(supabase)`,
-  `requireUser`/`requirePro` (assertion functions), `requireAdmin`,
-  `AuthzError` (códigos `UNAUTHENTICATED`/`PRO_REQUIRED`/`ADMIN_REQUIRED`).
-  Reemplaza los checks inline de `app/casos/actions.ts`,
-  `app/leyes/actions.ts` y `app/admin/actions.ts` (incl. `requireAdminClient`
-  helper en admin).
-- **Step 2.3**: nuevo `lib/action-result.ts` — `ActionResult<T>`, `runAction`,
-  `ActionError` (códigos adicionales `NOT_FOUND`/`VALIDATION`/`CONFLICT`/
-  `INTERNAL`); nunca expone `pgError.message` al cliente (23505 → `CONFLICT`,
-  resto → `INTERNAL` genérico + `console.error`). Las tres `actions.ts`
-  reescritas para devolver `ActionResult`. Consumidores actualizados:
-  `CasesClient.tsx`, `ParagraphHighlighter.tsx` (nuevo `PaywallModal` en
-  `PRO_REQUIRED`), `TierForm.tsx`, `NewReformForm.tsx`,
-  `app/casos/[id]/page.tsx`, `app/admin/reformas/[id]/page.tsx` (formularios
-  con `<form action={...}>` ahora usan wrappers `"use server"` inline que
-  descartan el `ActionResult`, ya que `Promise<ActionResult<T>>` no es
-  asignable al tipo esperado por `action`).
+- **Setup**: instalado `zod` y `vitest` (`npm test` → `vitest run`),
+  `vitest.config.ts` con alias `@` y stub de `server-only` (no resoluble en
+  Node) en `lib/test/empty-module.ts`. Helper compartido de mocks de Supabase
+  en `lib/test/mock-supabase.ts` (`makeBuilder`/`makeDb`, query builder
+  encadenable + `rpc`).
+- **Step 3.1**: nuevo `lib/services/annotations.ts` — `saveAnnotation`,
+  `updateAnnotationNote`, `deleteAnnotation`, `migrateAnnotations`,
+  `markReformSeen`, cada uno con su schema Zod (`SaveAnnotationInput`, etc.)
+  y firma `(db, actor, input)`. `app/leyes/actions.ts` ahora son wrappers
+  delgados: `getActor` → `Schema.parse` → service → `runAction`. 15 tests en
+  `lib/services/annotations.test.ts`.
+- **Step 3.2**: mismo patrón para `lib/services/cases.ts` (createCase,
+  deleteCase, addAnnotationToCase, removeAnnotationFromCase),
+  `lib/services/reforms.ts` (publishReform, createReformDraft, approveReform
+  — todas comparten el helper privado `supersedeArticle` para no duplicar la
+  lógica de "nueva versión de artículo + paragraphs + marcar superseded"),
+  y `lib/services/admin.ts` (findArticle, setUserTier). `app/casos/actions.ts`
+  y `app/admin/actions.ts` reescritos como wrappers delgados (~60 líneas cada
+  uno); `publishReform` se movió de `app/leyes/actions.ts` a
+  `lib/services/reforms.ts` (el wrapper sigue en `leyes/actions.ts`, sigue
+  pareciendo código muerto). 20 tests adicionales en
+  `lib/services/{cases,reforms,admin}.test.ts` (35 totales).
 
-**Cambio de alcance no solicitado pero consistente**: `publishReform` (en
-`app/leyes/actions.ts`) no tenía ningún check de autorización antes de este
-refactor; se le agregó `if (!actor.isAdmin) throw new AuthzError("ADMIN_REQUIRED")`.
-Parece código muerto (no se llama desde ningún componente cliente, solo
-referenciado en docs), pero se corrigió por consistencia con el resto del
-módulo — revisar si se debe eliminar en una fase futura.
+`npx vitest run` → 35/35 verde. `npx tsc --noEmit` limpio. `npm run build
+--turbopack` pasa (14 rutas). Verificado por grep: `lib/services/` no importa
+`next/*`; ningún `actions.ts` contiene `throw new Error(`. Smoke test con
+servidor dev limpio (`.next` borrado): `/leyes`→200, `/casos`→200,
+`/admin`→307 (redirect esperado para no-admin).
 
-`npx tsc --noEmit` limpio y `npm run build --turbopack` pasa (14 rutas).
-Verificado por grep: ningún `actions.ts` contiene `throw new Error(`. Servidor
-dev arrancó OK y smoke-test por curl: `/leyes`→200, `/casos`→200, `/admin`→307
-(redirect esperado para no-admin), `/leyes/[slug]/[section_id]`→200.
-
-Verificación interactiva completada con cuenta free real en navegador:
-`saveAnnotation` con color≠yellow devuelve `PRO_REQUIRED` y abre `PaywallModal`
-correctamente. **Bug encontrado y corregido**: `PaywallModal` se renderizaba
-directo dentro de `ParagraphHighlighter` (que vive dentro de un `<p>` en
-`Article.tsx`), causando errores de hidratación (`<div>`/`<h2>`/`<ul>` dentro
-de `<p>`) — igual que el problema que el tooltip ya resolvía con
-`createPortal` (decisión #6). Fix: el render de `PaywallModal` en
-`ParagraphHighlighter.tsx` ahora también usa
-`createPortal(<PaywallModal .../>, document.body)`. Re-verificado en
-navegador: sin errores de hidratación. `tsc`/build limpios tras el fix.
-
-Phase 2 completa y verificada end-to-end. Próxima sesión: Phase 3 (service
-layer extraction) de `LEXGT_EXECUTION_PLAN.md`.
+Próxima sesión: Step 3.3 (read-path query modules —
+`lib/services/queries/{laws,reading,search}.ts`, refactor de
+`app/leyes/page.tsx`, `[slug]/page.tsx`, `[slug]/[section_id]/page.tsx`,
+`app/api/search/route.ts`).
 
 ---
 
