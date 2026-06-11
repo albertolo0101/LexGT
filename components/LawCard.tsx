@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import type { Law, LawReform } from "@/lib/types"
+import type { Law, LawReform, Tier } from "@/lib/types"
 import { markReformSeen, migrateAnnotations } from "@/app/leyes/actions"
 import ReformModal from "./ReformModal"
 
@@ -12,7 +12,7 @@ type ArticlePair = { oldArticleId: string; newArticleId: string }
 interface Props {
   law: Law
   pendingReforms: LawReform[]
-  userTier: "anonymous" | "free" | "pro"
+  userTier: Tier
   articlePairsByReform: Record<string, ArticlePair[]>
   articleCount: number
   view: "grid" | "list"

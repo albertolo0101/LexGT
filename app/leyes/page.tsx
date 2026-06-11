@@ -2,7 +2,7 @@ import { createServerSupabaseClient } from "@/lib/supabase-server"
 import type { Metadata } from "next"
 import type { Law, LawReform } from "@/lib/types"
 import { getUserTier } from "@/lib/get-user-tier"
-import { getPendingReforms, type UserTier } from "@/lib/get-pending-reforms"
+import { getPendingReforms } from "@/lib/get-pending-reforms"
 import { getArticleCounts } from "@/lib/get-article-counts"
 import LeyesIndexClient from "./LeyesIndexClient"
 
@@ -13,11 +13,10 @@ export const metadata: Metadata = {
 
 export default async function LeyesPage() {
   const supabase = await createServerSupabaseClient()
-  const [{ data: { user } }, dbTier] = await Promise.all([
+  const [{ data: { user } }, tier] = await Promise.all([
     supabase.auth.getUser(),
     getUserTier(supabase),
   ])
-  const tier: UserTier = user ? dbTier : "anonymous"
 
   const [{ data: laws, error: lawsError }, { reformsByLaw, totalPending }, annotatedArticleIds] =
     await Promise.all([

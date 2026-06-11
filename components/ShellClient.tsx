@@ -4,10 +4,10 @@ import TopBar from './TopBar'
 import SidebarContent from './SidebarContent'
 import SearchOverlay from './SearchOverlay'
 import PaywallModal from './PaywallModal'
-import type { Law } from '@/lib/types'
+import type { Law, Tier } from '@/lib/types'
 
 export type SerializedUser = { email: string; id: string } | null
-export type EffectiveTier = 'anonymous' | 'free' | 'pro'
+export type EffectiveTier = Tier
 export type SidebarLaw = Pick<Law, 'id' | 'slug' | 'short_name' | 'decree'> & { hasAlert: boolean }
 export type SidebarCase = { id: string; title: string; color: string; count: number }
 

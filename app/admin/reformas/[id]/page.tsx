@@ -44,7 +44,11 @@ export default async function ReformDetailPage({ params }: Props) {
   if (error || !data) notFound()
 
   const reform = data as unknown as ReformDetail
-  const publishAction = approveReform.bind(null, reform.id)
+
+  async function publishAction() {
+    "use server"
+    await approveReform(reform.id)
+  }
 
   return (
     <div className="max-w-3xl space-y-8">

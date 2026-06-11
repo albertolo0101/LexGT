@@ -46,16 +46,16 @@ export default function CasesClient({ cases }: { cases: CaseWithCount[] }) {
     if (!title.trim()) return;
     setError(null);
     startTransition(async () => {
-      try {
-        await createCase({ title: title.trim(), description: description.trim() || undefined, color });
-        setModalOpen(false);
-        setTitle("");
-        setDescription("");
-        setColor("gray");
-        router.refresh();
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Error al crear caso");
+      const result = await createCase({ title: title.trim(), description: description.trim() || undefined, color });
+      if (!result.ok) {
+        setError(result.message);
+        return;
       }
+      setModalOpen(false);
+      setTitle("");
+      setDescription("");
+      setColor("gray");
+      router.refresh();
     });
   };
 

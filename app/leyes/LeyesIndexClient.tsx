@@ -3,13 +3,12 @@
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import type { Law, LawReform } from '@/lib/types'
+import type { Law, LawReform, Tier } from '@/lib/types'
 import LawCard from '@/components/LawCard'
 import PaywallModal from '@/components/PaywallModal'
 import { Ico } from '@/components/icons'
 
 type ArticlePair = { oldArticleId: string; newArticleId: string }
-type Tier = 'anonymous' | 'free' | 'pro'
 
 const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
 

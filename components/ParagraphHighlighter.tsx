@@ -4,10 +4,12 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import type { Annotation, Tier } from "@/lib/types";
+import type { ActionResult } from "@/lib/action-result";
 import { saveAnnotation, deleteAnnotation, updateAnnotationNote } from "@/app/leyes/actions";
 import { addAnnotationToCase } from "@/app/casos/actions";
 import { createClient } from "@/lib/supabase";
 import { HL_TOKENS } from "@/lib/case-colors";
+import PaywallModal from "./PaywallModal";
 
 type AnnotationColor = 'yellow' | 'green' | 'blue' | 'pink';
 
@@ -80,8 +82,19 @@ export default function ParagraphHighlighter({
   const [casesOpen, setCasesOpen] = useState(false);
   const [userCases, setUserCases] = useState<UserCase[] | null>(null);
   const [casesLoading, setCasesLoading] = useState(false);
+  const [paywallOpen, setPaywallOpen] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const router = useRouter();
+
+  const handleActionResult = (result: ActionResult<unknown>) => {
+    if (result.ok) return;
+    if (result.code === "PRO_REQUIRED") {
+      setPaywallOpen(true);
+    } else {
+      setActionError(result.message);
+    }
+  };
 
   useEffect(() => {
     const dismiss = (e: MouseEvent) => {
@@ -122,9 +135,11 @@ export default function ParagraphHighlighter({
     const { start, end } = tooltip;
     setTooltip(null);
     window.getSelection()?.removeAllRanges();
+    setActionError(null);
     startTransition(async () => {
-      await saveAnnotation({ paragraph_id: paragraphId, article_id: articleId, char_start: start, char_end: end, color: selectedColor });
-      router.refresh();
+      const result = await saveAnnotation({ paragraph_id: paragraphId, article_id: articleId, char_start: start, char_end: end, color: selectedColor });
+      handleActionResult(result);
+      if (result.ok) router.refresh();
     });
   };
 
@@ -132,9 +147,11 @@ export default function ParagraphHighlighter({
     if (!tooltip || tooltip.kind !== "existing") return;
     const { annotationId } = tooltip;
     setTooltip(null);
+    setActionError(null);
     startTransition(async () => {
-      await updateAnnotationNote(annotationId, noteText || null);
-      router.refresh();
+      const result = await updateAnnotationNote(annotationId, noteText || null);
+      handleActionResult(result);
+      if (result.ok) router.refresh();
     });
   };
 
@@ -142,9 +159,11 @@ export default function ParagraphHighlighter({
     if (!tooltip || tooltip.kind !== "existing") return;
     const { annotationId } = tooltip;
     setTooltip(null);
+    setActionError(null);
     startTransition(async () => {
-      await deleteAnnotation(annotationId);
-      router.refresh();
+      const result = await deleteAnnotation(annotationId);
+      handleActionResult(result);
+      if (result.ok) router.refresh();
     });
   };
 
@@ -167,8 +186,10 @@ export default function ParagraphHighlighter({
     const { annotationId } = tooltip;
     setCasesOpen(false);
     setTooltip(null);
+    setActionError(null);
     startTransition(async () => {
-      await addAnnotationToCase({ caseId, annotationId });
+      const result = await addAnnotationToCase({ caseId, annotationId });
+      handleActionResult(result);
     });
   };
 
@@ -280,11 +301,17 @@ export default function ParagraphHighlighter({
                 >
                   {pending ? "…" : "Eliminar"}
                 </button>
+                {actionError && (
+                  <p className="text-xs text-red-300">{actionError}</p>
+                )}
               </div>
             )}
           </div>,
           document.body
         )}
+
+      {paywallOpen &&
+        createPortal(<PaywallModal onClose={() => setPaywallOpen(false)} />, document.body)}
     </>
   );
 }

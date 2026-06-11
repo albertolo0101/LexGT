@@ -1,10 +1,8 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { LawReform } from './types'
+import type { LawReform, Tier } from './types'
 
-export type UserTier = 'anonymous' | 'free' | 'pro'
-
-function cutoffDate(tier: UserTier): string {
+function cutoffDate(tier: Tier): string {
   const d = new Date()
   if (tier === 'anonymous') d.setDate(d.getDate() - 7)
   else if (tier === 'free') d.setMonth(d.getMonth() - 1)
@@ -20,7 +18,7 @@ export type PendingReforms = {
 // Reformas publicadas dentro de la ventana del tier que el usuario aún no ha marcado como vistas.
 export async function getPendingReforms(
   supabase: SupabaseClient,
-  tier: UserTier,
+  tier: Tier,
   userId: string | null
 ): Promise<PendingReforms> {
   const [{ data: reforms }, seenReformIds] = await Promise.all([

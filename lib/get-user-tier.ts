@@ -1,10 +1,10 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { Tier } from './types'
+import type { AuthedTier, Tier } from './types'
 
 export async function getUserTier(supabase: SupabaseClient): Promise<Tier> {
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return 'free'
+  if (!user) return 'anonymous'
 
   const { data: profile } = await supabase
     .from('user_profiles')
@@ -18,5 +18,5 @@ export async function getUserTier(supabase: SupabaseClient): Promise<Tier> {
     return 'free'
   }
 
-  return (profile.tier as Tier) ?? 'free'
+  return (profile.tier as AuthedTier) ?? 'free'
 }

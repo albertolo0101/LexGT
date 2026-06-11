@@ -76,11 +76,12 @@ export type ReformNotification = {
   seen_at: string | null
 }
 
-export type Tier = 'free' | 'pro'
+export type Tier = 'anonymous' | 'free' | 'pro'
+export type AuthedTier = Exclude<Tier, 'anonymous'>
 
 export type UserProfile = {
   user_id: string
-  tier: Tier
+  tier: AuthedTier
   tier_expires_at: string | null
   tier_source: string
   created_at: string

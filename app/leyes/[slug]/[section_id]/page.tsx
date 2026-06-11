@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import type { Annotation, Law, LawReform, Section, ArticleWithParagraphs } from "@/lib/types";
 import { getUserTier } from "@/lib/get-user-tier";
-import { getPendingReforms, type UserTier } from "@/lib/get-pending-reforms";
+import { getPendingReforms } from "@/lib/get-pending-reforms";
 import { sectionLabel } from "@/lib/section-kind";
 import DocHeader from "./DocHeader";
 import ChapterRail from "./ChapterRail";
@@ -45,7 +45,7 @@ export default async function SectionReadingPage({ params }: Props) {
     { data: sectionRow },
     { data: articlesRaw, error: articlesError },
     { data: { user } },
-    dbTier,
+    tier,
   ] = await Promise.all([
     supabase.from("laws").select("*").eq("slug", slug).single(),
     supabase.from("sections").select("*").eq("id", section_id).single(),
@@ -64,8 +64,6 @@ export default async function SectionReadingPage({ params }: Props) {
 
   if (!law || !section) notFound();
   if (articlesError) throw new Error(articlesError.message);
-
-  const tier: UserTier = user ? dbTier : "anonymous";
 
   const articles = ((articlesRaw as ArticleWithParagraphs[]) ?? []).map((a) => ({
     ...a,

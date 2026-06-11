@@ -1,6 +1,6 @@
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { getUserTier } from '@/lib/get-user-tier'
-import { getPendingReforms, type UserTier } from '@/lib/get-pending-reforms'
+import { getPendingReforms } from '@/lib/get-pending-reforms'
 import ShellClient from './ShellClient'
 import type { Case } from '@/lib/types'
 
@@ -9,7 +9,7 @@ type CaseRow = Pick<Case, 'id' | 'title' | 'color'> & { case_annotations: { id: 
 export default async function AppShell({ children }: { children: React.ReactNode }) {
   const supabase = await createServerSupabaseClient()
 
-  const [{ data: { user } }, lawsResult, dbTier] = await Promise.all([
+  const [{ data: { user } }, lawsResult, tier] = await Promise.all([
     supabase.auth.getUser(),
     supabase
       .from('laws')
@@ -19,7 +19,6 @@ export default async function AppShell({ children }: { children: React.ReactNode
     getUserTier(supabase),
   ])
 
-  const tier: UserTier = user ? dbTier : 'anonymous'
   const laws = lawsResult.data ?? []
 
   const [{ reformsByLaw, totalPending }, casesRaw] = await Promise.all([

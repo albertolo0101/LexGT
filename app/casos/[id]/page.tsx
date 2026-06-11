@@ -57,8 +57,12 @@ export default async function CaseDetailPage({ params }: Props) {
   if (!theCase) notFound();
 
   const caseAnnotations = (theCase.case_annotations ?? []) as unknown as CaseAnnotationRow[];
+  const caseId = theCase.id;
 
-  const deleteCaseAction = deleteCase.bind(null, theCase.id);
+  async function deleteCaseAction() {
+    "use server";
+    await deleteCase(caseId);
+  }
 
   return (
     <div className="min-h-screen bg-white">
@@ -105,7 +109,10 @@ export default async function CaseDetailPage({ params }: Props) {
                 ? null
                 : ann.paragraphs?.text.slice(ann.char_start, ann.char_end) ?? null;
 
-              const removeFn = removeAnnotationFromCase.bind(null, ca.id);
+              async function removeFn() {
+                "use server";
+                await removeAnnotationFromCase(ca.id);
+              }
 
               return (
                 <div key={ca.id} className="border border-gray-100 rounded-lg p-4 space-y-2">

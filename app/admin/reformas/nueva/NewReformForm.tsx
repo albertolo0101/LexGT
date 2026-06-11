@@ -45,13 +45,15 @@ export default function NewReformForm({ laws }: { laws: Law[] }) {
     setNewText("")
     try {
       const result = await findArticle(lawId, searchNumber.trim())
-      if (!result) {
+      if (!result.ok) {
+        setSearchError(result.message)
+      } else if (!result.data) {
         setSearchError("Artículo no encontrado.")
       } else {
-        setFound(result)
+        setFound(result.data)
       }
-    } catch (e) {
-      setSearchError(e instanceof Error ? e.message : "Error al buscar.")
+    } catch {
+      setSearchError("Error al buscar.")
     } finally {
       setSearchLoading(false)
     }
@@ -90,9 +92,14 @@ export default function NewReformForm({ laws }: { laws: Law[] }) {
         description: description.trim(),
         articles: articles.map((a) => ({ articleId: a.articleId, newText: a.newText })),
       })
-      router.push(`/admin/reformas/${result.id}`)
-    } catch (e) {
-      setSubmitError(e instanceof Error ? e.message : "Error inesperado.")
+      if (!result.ok) {
+        setSubmitError(result.message)
+        setSubmitting(false)
+        return
+      }
+      router.push(`/admin/reformas/${result.data.id}`)
+    } catch {
+      setSubmitError("Error inesperado.")
       setSubmitting(false)
     }
   }
