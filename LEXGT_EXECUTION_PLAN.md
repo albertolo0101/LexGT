@@ -236,11 +236,11 @@ Goal: expose the Phase 3 services over HTTP for React Native. Web app keeps usin
 
 ---
 
-## Phase 5 — Annotation anchoring v2 (data integrity)
+## Phase 5 — Annotation anchoring v2 (data integrity) — ✓ COMPLETE
 
 Goal: highlights survive typo corrections and re-extractions. Design follows the W3C Web Annotation "TextQuoteSelector + TextPositionSelector" pattern (the approach used by Hypothesis): offsets are a fast path, quoted text + context is the durable anchor.
 
-### Step 5.1 — Schema: add quote anchors + orphan state
+### Step 5.1 — Schema: add quote anchors + orphan state — ✓ DONE (`0014_annotation_anchors.sql`)
 - **Files:** `supabase/migrations/0013_annotation_anchors.sql`, `lib/types.ts`
 - **Problem:** `char_start/char_end` into `paragraphs.text` silently corrupt on any text edit.
 - **Actions:** Add to `annotations`:
@@ -250,7 +250,7 @@ Goal: highlights survive typo corrections and re-extractions. Design follows the
   - Backfill: for every existing annotation, compute `quote/prefix/suffix/checksum` from current paragraph text using stored offsets (SQL `substring`). Annotations whose offsets exceed current text length → `orphaned`.
 - **Success criteria:** Migration runs on a prod-schema copy; `SELECT count(*) FROM annotations WHERE quote IS NULL` = 0; orphan count reported and plausible (likely 0 today).
 
-### Step 5.2 — Save & render paths use anchors
+### Step 5.2 — Save & render paths use anchors — ✓ DONE
 - **Files:** `lib/services/annotations.ts`, `components/ParagraphHighlighter.tsx`, `lib/anchoring.ts` (new)
 - **Problem:** Client must capture and resolve anchors.
 - **Actions:**
@@ -262,7 +262,7 @@ Goal: highlights survive typo corrections and re-extractions. Design follows the
   3. Render: orphaned annotations show in the Notas panel with an "el texto cambió" badge instead of an inline highlight; reanchored ones render normally. Persist re-anchors lazily (fire-and-forget update with new offsets + checksum + status).
 - **Success criteria:** Unit tests for `resolveAnchor` covering: unchanged text, typo before the quote (offsets shift, quote intact → reanchored), typo inside the quote (→ orphaned), duplicate quote text disambiguated by prefix. UI smoke: manually `UPDATE paragraphs SET text = ...` inserting a word before a highlight → highlight still renders correctly after reload.
 
-### Step 5.3 — Admin "corrección de texto" path (distinct from reforms)
+### Step 5.3 — Admin "corrección de texto" path (distinct from reforms) — ✓ DONE
 - **Files:** `lib/services/admin.ts` (`correctParagraphText`), `app/admin/actions.ts`, small admin UI affordance (optional this phase: SQL-only function is acceptable)
 - **Problem:** The reform flow is the only sanctioned way to change text, but typo fixes are not reforms — admins/the extractor will otherwise edit `paragraphs.text` raw and orphan annotations silently.
 - **Actions:** `correctParagraphText(db, actor, { paragraphId, newText })`: requires admin; updates text; runs `resolveAnchor` server-side for every annotation on that paragraph, persisting new offsets/status; returns counts `{ reanchored, orphaned }`. Document in `docs/SECURITY.md`/extractor README: **raw UPDATEs to `paragraphs.text` are forbidden; corrections go through this function; structural changes go through reforms.**
@@ -272,17 +272,35 @@ Goal: highlights survive typo corrections and re-extractions. Design follows the
 
 ## Phase 6 — Testing & CI
 
-### Step 6.1 — RLS test suite (highest-value tests in the repo)
-- **Files:** `supabase/tests/rls.test.sql` (pgTAP via `supabase test db`) or `tests/rls/*.test.ts` (Vitest against local Supabase with two seeded users — pick whichever the local toolchain supports; pgTAP preferred)
+### Step 6.1 — RLS test suite (highest-value tests in the repo) ✓ DONE (2026-06-12)
+- **Files:** `supabase/tests/database/rls.test.sql` (pgTAP via `supabase test db`), `npm run test:rls`
 - **Problem:** Every Phase 1 guarantee is currently verified by hand.
-- **Actions:** Seed `free@test`, `pro@test`, `expired-pro@test`, `admin@test`. Assert the full E1/E2/E3 matrix: self-grant admin via user_metadata is inert; tier PATCH blocked; pink/noted annotation blocked for free, allowed for pro, blocked for expired-pro; cases blocked for free; cross-user reads return zero rows on `annotations`, `cases`, `reform_notifications`, `user_profiles`.
-- **Success criteria:** `supabase test db` (or `npm run test:rls`) green locally against a from-scratch `db reset` — proving migrations 0001–0013 are self-sufficient.
+- **Actions:** Seeded `free@test`, `pro@test`, `expired@test`, `admin@test`, `other@test`, `target@test` (6th user, dedicated to the E2 admin-update assertion so it doesn't mutate the free-user fixture used by E3). Asserted the full E1/E2/E3 matrix: self-grant admin via user_metadata is inert; tier UPDATE blocked for self / allowed for admin; pink/noted annotation blocked for free, allowed for pro, blocked for expired-pro; cases blocked for free, allowed for pro; cross-user reads return zero rows on `annotations`, `cases`, `reform_notifications`, `user_profiles`.
+- **Schema-reconciliation gap found & fixed:** a from-scratch `db reset` (migrations 0001-0017 + seed) left `anon`/`authenticated`/`service_role` without table-level SELECT/INSERT/UPDATE/DELETE grants on any `public` table (only TRIGGER/TRUNCATE/REFERENCES were present) — RLS policies never even get evaluated without the underlying grant. Prod had these grants already, applied out-of-band by Supabase's project-provisioning step. Added `0018_grant_table_privileges.sql` (`grant all ... to anon, authenticated, service_role` + matching `alter default privileges`) and applied to prod for parity.
+- **Success criteria:** ✓ `npm run test:rls` (`supabase test db`) green — 15/15 — against a from-scratch `db reset` (migrations 0001-0018 + seed).
 
 ### Step 6.2 — Content pipeline validation gate
-- **Files:** `supabase/functions_sql/validate_law.sql` (tracked in a migration `0014_validate_law.sql`), extractor repo: post-load step
+- **Files:** `supabase/migrations/0015_validate_law.sql` (✓), `0016_dedupe_paragraphs.sql` (✓), `0017_validate_law_tolerate_derogado.sql` (✓) — all applied to prod. Extractor repo: post-load step (pending, extractor-scope, see below).
 - **Problem:** Nothing verifies extractor output satisfies app assumptions (review gap #6).
-- **Actions:** `public.validate_law(law_slug text) returns table(check_name text, ok boolean, detail text)` asserting per law: ≥1 section; all `sections.kind` valid; `(parent_id, position)` unique among siblings; every article has ≥1 paragraph; `(article_id, position)` unique; all current articles have `is_current=true` exactly once per `number`; non-empty `paragraphs.text`; search_vector non-null. Extractor runs `SELECT * FROM validate_law('<slug>') WHERE NOT ok;` after each load and fails loudly on rows.
-- **Success criteria:** Running it on all 15 loaded laws returns zero failing rows (fix data or checks until true — investigate, don't loosen blindly); extractor README documents the gate.
+- **Actions:** ✓ `public.validate_law(law_slug text) returns table(check_name text, ok boolean, detail text)` asserting per law: `law_exists`, `has_sections`, `sections_kind_valid`, `sections_sibling_position_unique`, `articles_have_paragraphs`, `paragraphs_position_unique`, `one_current_article_per_number`, `paragraphs_nonempty_text`, `articles_search_vector`, `paragraphs_search_vector`. Deployed to prod (`enrykddxhqsibbokrood`) via Supabase MCP.
+- **Status: ✓ "6.2a" (non-extractor cleanup) DONE (2026-06-12)** — see below. **Remaining failures are all extractor-scope** (real content gaps + numbering/position bugs in `lex-extractor`'s output) and are deferred to the planned extractor-fix session (after Phase 7). **Do not mark 6.2 fully done** until that session re-runs extraction for affected laws and `validate_law()` returns zero failing rows across all 15 laws.
+- **Success criteria (unchanged):** Running it on all 15 loaded laws returns zero failing rows (fix data or checks until true — investigate, don't loosen blindly); extractor README documents the gate.
+
+#### 6.2a — completed without touching the extractor (2026-06-12)
+
+1. **`paragraphs_position_unique` — FIXED.** `0016_dedupe_paragraphs.sql`: re-pointed the 3 annotations whose `paragraph_id` referenced an "extra" duplicate (matched on identical `article_id`+`position`+`text`, kept the earliest `created_at`) to the kept row, deleted the 7,369 extra duplicate `paragraphs` rows, and added `UNIQUE (article_id, position)` (`paragraphs_article_id_position_key`) so the extractor's `ON CONFLICT` becomes effective on future re-runs. Verified post-apply: `paragraphs_position_unique` is now 0 failures across all 15 laws.
+
+2. **`articles_have_paragraphs` — check refined, data gap remains.** `0017_validate_law_tolerate_derogado.sql`: the check now excludes articles with `heading ILIKE '%derogad%'` (55 articles, legitimately empty — repealed). Reduced failure counts accordingly (e.g. `codigo-penal-de-guatemala` 225 → 163), but **~1,007 articles still have zero paragraphs** — real content gaps from extraction, **extractor-scope**, deferred.
+
+#### Remaining findings — all extractor-scope, deferred to the post-Phase-7 extractor session (2026-06-12)
+
+1. **`articles_have_paragraphs` (~1,007 articles, almost every law)** — extraction silently dropped body text for these articles. Worst offenders: `codigo-penal-de-guatemala` (163), `ley-electoral-y-de-partidos-politicos` (195), `codigo-de-trabajo` (161). Needs investigation in `lex-extractor` (parsing edge case — short articles, articles immediately followed by a section break, etc.) and re-extraction of affected laws.
+
+2. **`sections_sibling_position_unique` (35 duplicate pairs across 7 laws** — `codigo-de-comercio-de-guatemala` 10, `ley-general-de-electricidad` 8, `constitucion-politica-de-la-republica-de-guatemala` 5, `codigo-de-trabajo` 3, `codigo-procesal-civil-y-mercantil` 4, `ley-electoral-y-de-partidos-politicos` 4, `codigo-penal-de-guatemala` 1**). Root cause confirmed by inspection (not a re-extraction duplicate — these are distinct rows with different `kind`/`heading`): the extractor assigns `position` from a **single counter shared across all top-level sections regardless of `kind`** (e.g. `titulo`, `capitulo`, `seccion`, `subseccion` siblings under `parent_id = null` all land on `position 1, 2, 3...` independently, colliding). Fix is a `lex-extractor` change to scope the position counter per `(parent_id, kind)` — or per the law's actual reading order — not a data-cleanup task.
+
+3. **`one_current_article_per_number` (11 article numbers across 3 laws** — `ley-organica-del-organismo-legislativo` 8, `ley-de-garantias-mobiliarias` 2, `ley-de-lo-contencioso-administrativo` 1**). Root cause confirmed by inspection: these are **distinct articles with completely different headings/content that the extractor numbered identically** (e.g. in `ley-organica-del-organismo-legislativo`, four different articles — "Publicaciones del Congreso", "Publicidad e información", "Disponibilidad de información en Internet", "Consulta electrónica" — are all stored as article `152`). This strongly suggests the source law uses suffixed numbering (`152 Bis`, `152 Ter`, `152 Quater`, a common pattern in Guatemalan legislation) and the extractor strips the suffix, collapsing distinct articles onto one `number`. Fix is a `lex-extractor` change to preserve `Bis`/`Ter`/`Quater`/etc. suffixes in `articles.number` — not a data-cleanup task.
+
+**Recommendation for the extractor session:** open `lex-extractor` (`PDFtoSQLapp/pdf-sql-LEX/lex-extractor`) and address, in order: (a) the `Bis`/`Ter` numbering bug (#3 above, smallest blast radius), (b) the per-kind section-position counter bug (#2), (c) the content-gap investigation (#1, largest effort). Add a post-load step running `validate_law('<slug>')` per law and failing loudly so future re-extractions can't regress silently — this also covers the `paragraphs`/`sections` `UNIQUE` constraints added in 6.2a (extractor should target them with `ON CONFLICT`).
 
 ### Step 6.3 — Unit + e2e + GitHub Actions
 - **Files:** `.github/workflows/ci.yml`, `playwright.config.ts`, `tests/e2e/smoke.spec.ts`
@@ -298,20 +316,20 @@ Goal: highlights survive typo corrections and re-extractions. Design follows the
 
 Goal: ensure OCR contract generation and legal/financial calculators can be added without touching the reading core. **No heavy implementation in this phase — conventions + one scaffold.**
 
-### Step 7.1 — Module convention
-- **Files:** `docs/MODULES.md` (new), `lib/modules/` (empty scaffold with README)
+### Step 7.1 — Module convention ✓ DONE (2026-06-12)
+- **Files:** `docs/MODULES.md`, `lib/modules/README.md`
 - **Problem:** Without a convention, future features will accrete into `lib/services` and the core bundle.
-- **Actions:** Document and scaffold the rule set:
+- **Actions:** Documented and scaffolded the rule set:
   - A module = `lib/modules/<name>/{service.ts, schemas.ts, README.md}` + routes under `app/api/v1/<name>/` + (if UI) routes under `app/(modules)/<name>/` — lazy-loaded, never imported by core reading components.
   - Module tables get a prefix (`calc_`, `contracts_`) and their own tracked migrations; RLS mandatory; tier gating via the same `is_pro()`/`WITH CHECK` pattern from Phase 1.
   - **Compute placement rule:** synchronous & light (labor-benefits calculator: pure TS math) → runs in the module's route handler on Vercel. Heavy/async/binary (OCR of IDs, PDF contract rendering) → a separate worker deployable (Railway — same box later reused for the Phase 13 jurisprudencia scraper) consuming a `jobs` table (Postgres `FOR UPDATE SKIP LOCKED` polling; no queue infra needed at this scale), with results written back and the client polling `/api/v1/<module>/jobs/[id]`. **Sensitive uploads (ID photos) go to a private Supabase Storage bucket with owner-only policies and a retention/auto-delete job — never into Postgres rows.**
-- **Success criteria:** `docs/MODULES.md` committed and linked from `CLAUDE.md`; scaffold exists.
+- **Success criteria:** ✓ `docs/MODULES.md` committed and linked from `CLAUDE.md`; scaffold exists.
 
-### Step 7.2 — Prove the pattern with the cheapest module: `calc-laboral` (skeleton only)
-- **Files:** `lib/modules/calc-laboral/{service.ts,schemas.ts}`, `app/api/v1/calc-laboral/route.ts`, unit tests
+### Step 7.2 — Prove the pattern with the cheapest module: `calc-laboral` (skeleton only) ✓ DONE (2026-06-12)
+- **Files:** `lib/modules/calc-laboral/{service.ts,schemas.ts,README.md,service.test.ts}`, `app/api/v1/calc-laboral/route.ts`
 - **Problem:** Conventions untested are conventions ignored.
-- **Actions:** One pure function (e.g. `indemnización` per Código de Trabajo formula) behind a zod schema and a v1 route, Pro-gated via `requirePro`. No UI yet.
-- **Success criteria:** Unit tests for the formula; route returns 403 for free token, 200 with correct math for pro token; zero imports from `lib/modules` anywhere in core reading components (grep).
+- **Actions:** `calculateIndemnizacion` — pure function for Art. 82 Código de Trabajo (indemnización por despido injustificado, 30/360 day-count prorating), zod schema (`IndemnizacionInput`/`IndemnizacionResult`), `POST /api/v1/calc-laboral` Pro-gated via `requirePro`. No DB table, no UI. Documented in `docs/API.md`.
+- **Success criteria:** ✓ Unit tests for the formula (4 cases: free-user rejection, exact-year, 30/360 proration, zero-duration) — 67/67 vitest green. `requirePro` throws `AuthzError('PRO_REQUIRED')` → `apiHandler` maps to `403 PRO_REQUIRED` for free tokens (same mapping already covered for `cases`). `grep -r "lib/modules" app/leyes components lib/services/queries` → empty. `tsc`/`lint`/`build --turbopack` all green.
 
 ---
 

@@ -9,6 +9,7 @@ import { saveAnnotation, deleteAnnotation, updateAnnotationNote } from "@/app/le
 import { addAnnotationToCase } from "@/app/casos/actions";
 import { createClient } from "@/lib/supabase";
 import { HL_TOKENS } from "@/lib/case-colors";
+import { ANCHOR_CONTEXT_LENGTH } from "@/lib/anchoring";
 import PaywallModal from "./PaywallModal";
 
 type AnnotationColor = 'yellow' | 'green' | 'blue' | 'pink';
@@ -136,8 +137,11 @@ export default function ParagraphHighlighter({
     setTooltip(null);
     window.getSelection()?.removeAllRanges();
     setActionError(null);
+    const quote = text.slice(start, end);
+    const prefix = text.slice(Math.max(0, start - ANCHOR_CONTEXT_LENGTH), start);
+    const suffix = text.slice(end, end + ANCHOR_CONTEXT_LENGTH);
     startTransition(async () => {
-      const result = await saveAnnotation({ paragraph_id: paragraphId, article_id: articleId, char_start: start, char_end: end, color: selectedColor });
+      const result = await saveAnnotation({ paragraph_id: paragraphId, article_id: articleId, char_start: start, char_end: end, quote, prefix, suffix, color: selectedColor });
       handleActionResult(result);
       if (result.ok) router.refresh();
     });

@@ -46,6 +46,8 @@ export type ArticleWithParagraphs = Article & { paragraphs: Paragraph[] }
 
 export type SectionNode = Section & { children: SectionNode[] }
 
+export type AnchorStatus = 'anchored' | 'reanchored' | 'orphaned'
+
 export type Annotation = {
   id: string
   user_id: string
@@ -56,6 +58,11 @@ export type Annotation = {
   char_end: number
   note: string | null
   is_pinned_to_old_version: boolean
+  quote: string | null
+  prefix: string | null
+  suffix: string | null
+  text_checksum: string | null
+  anchor_status: AnchorStatus
   created_at: string
   updated_at: string
 }

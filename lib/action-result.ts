@@ -6,6 +6,7 @@ export type ActionErrorCode =
   | 'NOT_FOUND'
   | 'VALIDATION'
   | 'CONFLICT'
+  | 'RATE_LIMITED'
   | 'INTERNAL'
 
 export type ActionResult<T = void> =
@@ -31,13 +32,14 @@ export class ActionError extends Error {
   }
 }
 
-const FALLBACK_MESSAGES: Record<ActionErrorCode, string> = {
+export const FALLBACK_MESSAGES: Record<ActionErrorCode, string> = {
   UNAUTHENTICATED: 'Debes iniciar sesión para hacer esto.',
   PRO_REQUIRED: 'Esta función requiere el plan Pro.',
   ADMIN_REQUIRED: 'No autorizado.',
   NOT_FOUND: 'No encontrado.',
   VALIDATION: 'Datos inválidos.',
   CONFLICT: 'Ya existe.',
+  RATE_LIMITED: 'Demasiadas solicitudes. Intenta de nuevo en un momento.',
   INTERNAL: 'Ocurrió un error. Intenta de nuevo.',
 }
 

@@ -9,7 +9,10 @@ import {
   deleteAnnotation,
   migrateAnnotations,
   markReformSeen,
+  reanchorAnnotation,
 } from "./annotations";
+
+const paragraphBuilder = () => makeBuilder({ data: { text: "hola mundo" }, error: null });
 
 const anonymousActor: Actor = { userId: null, tier: "anonymous", isAdmin: false };
 const freeActor: Actor = { userId: "free-user", tier: "free", isAdmin: false };
@@ -24,6 +27,7 @@ describe("saveAnnotation", () => {
         article_id: "a1",
         char_start: 0,
         char_end: 5,
+        quote: "hola ",
       })
     ).rejects.toBeInstanceOf(AuthzError);
   });
@@ -35,6 +39,7 @@ describe("saveAnnotation", () => {
       article_id: "a1",
       char_start: 0,
       char_end: 5,
+      quote: "hola ",
       color: "pink",
     });
     await expect(promise).rejects.toMatchObject({ code: "PRO_REQUIRED" });
@@ -42,29 +47,45 @@ describe("saveAnnotation", () => {
 
   it("allows yellow highlights for free users", async () => {
     const insertBuilder = makeBuilder({ data: null, error: null });
-    const db = makeDb([insertBuilder]);
+    const db = makeDb([paragraphBuilder(), insertBuilder]);
 
     await saveAnnotation(db, freeActor, {
       paragraph_id: "p1",
       article_id: "a1",
       char_start: 0,
       char_end: 5,
+      quote: "hola ",
     });
 
     expect(insertBuilder.insert).toHaveBeenCalledWith(
-      expect.objectContaining({ user_id: "free-user", color: "yellow" })
+      expect.objectContaining({ user_id: "free-user", color: "yellow", quote: "hola ", anchor_status: "anchored" })
     );
+  });
+
+  it("rejects a note for free users even with color yellow", async () => {
+    const db = makeDb([]);
+    const promise = saveAnnotation(db, freeActor, {
+      paragraph_id: "p1",
+      article_id: "a1",
+      char_start: 0,
+      char_end: 5,
+      quote: "hola ",
+      color: "yellow",
+      note: "text",
+    });
+    await expect(promise).rejects.toMatchObject({ code: "PRO_REQUIRED" });
   });
 
   it("allows non-yellow colors for pro users", async () => {
     const insertBuilder = makeBuilder({ data: null, error: null });
-    const db = makeDb([insertBuilder]);
+    const db = makeDb([paragraphBuilder(), insertBuilder]);
 
     await saveAnnotation(db, proActor, {
       paragraph_id: "p1",
       article_id: "a1",
       char_start: 0,
       char_end: 5,
+      quote: "hola ",
       color: "pink",
     });
 
@@ -226,5 +247,43 @@ describe("markReformSeen", () => {
     expect(insertBuilder.insert).toHaveBeenCalledWith(
       expect.objectContaining({ user_id: "free-user", reform_id: "reform1" })
     );
+  });
+});
+
+describe("reanchorAnnotation", () => {
+  it("is a no-op for anonymous actors", async () => {
+    const db = makeDb([]);
+    await reanchorAnnotation(db, anonymousActor, {
+      id: "ann1",
+      char_start: 4,
+      char_end: 12,
+      text_checksum: "abc123",
+      anchor_status: "reanchored",
+    });
+    expect(db.from).not.toHaveBeenCalled();
+  });
+
+  it("updates offsets/checksum/status scoped to the owner", async () => {
+    const updateBuilder = makeBuilder({ data: null, error: null });
+    const db = makeDb([updateBuilder]);
+
+    await reanchorAnnotation(db, freeActor, {
+      id: "ann1",
+      char_start: 4,
+      char_end: 12,
+      text_checksum: "abc123",
+      anchor_status: "reanchored",
+    });
+
+    expect(updateBuilder.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        char_start: 4,
+        char_end: 12,
+        text_checksum: "abc123",
+        anchor_status: "reanchored",
+      })
+    );
+    expect(updateBuilder.eq).toHaveBeenCalledWith("id", "ann1");
+    expect(updateBuilder.eq).toHaveBeenCalledWith("user_id", "free-user");
   });
 });

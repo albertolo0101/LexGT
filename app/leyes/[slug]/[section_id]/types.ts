@@ -8,6 +8,16 @@ export type NoteItem = {
   sectionId: string | null
 }
 
+export type OrphanedAnnotation = {
+  id: string
+  color: 'yellow' | 'green' | 'blue' | 'pink'
+  note: string | null
+  quote: string
+  articleNumber: string
+  articleHeading: string | null
+  sectionId: string | null
+}
+
 export type SiblingSection = {
   id: string
   kind: string

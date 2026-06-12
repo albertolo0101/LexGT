@@ -11,6 +11,9 @@ export async function saveAnnotation(data: {
   article_id: string;
   char_start: number;
   char_end: number;
+  quote: string;
+  prefix?: string | null;
+  suffix?: string | null;
   color?: string;
   note?: string | null;
 }): Promise<ActionResult<void>> {
@@ -19,6 +22,21 @@ export async function saveAnnotation(data: {
     const actor = await getActor(supabase);
     const input = annotationsService.SaveAnnotationInput.parse(data);
     await annotationsService.saveAnnotation(supabase, actor, input);
+  });
+}
+
+export async function reanchorAnnotation(data: {
+  id: string;
+  char_start: number;
+  char_end: number;
+  text_checksum: string;
+  anchor_status: "anchored" | "reanchored" | "orphaned";
+}): Promise<ActionResult<void>> {
+  return runAction(async () => {
+    const supabase = await createServerSupabaseClient();
+    const actor = await getActor(supabase);
+    const input = annotationsService.ReanchorAnnotationInput.parse(data);
+    await annotationsService.reanchorAnnotation(supabase, actor, input);
   });
 }
 

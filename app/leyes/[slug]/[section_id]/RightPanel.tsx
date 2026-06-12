@@ -5,7 +5,7 @@ import { Ico } from '@/components/icons'
 import { HL_COLORS } from '@/lib/case-colors'
 import PaywallModal from '@/components/PaywallModal'
 import type { LawReform } from '@/lib/types'
-import type { NoteItem } from './types'
+import type { NoteItem, OrphanedAnnotation } from './types'
 
 const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
 
@@ -26,16 +26,18 @@ const TABS: { id: Tab; label: string }[] = [
 export default function RightPanel({
   tier,
   notes,
+  orphanedAnnotations,
   reforms,
   lawSlug,
 }: {
   tier: 'anonymous' | 'free' | 'pro'
   notes: NoteItem[]
+  orphanedAnnotations: OrphanedAnnotation[]
   reforms: LawReform[]
   lawSlug: string
 }) {
   const [open, setOpen] = useState(true)
-  const [tab, setTab] = useState<Tab>(notes.length > 0 ? 'notas' : 'historial')
+  const [tab, setTab] = useState<Tab>(notes.length > 0 || orphanedAnnotations.length > 0 ? 'notas' : 'historial')
   const [paywallOpen, setPaywallOpen] = useState(false)
 
   if (!open) {
@@ -80,30 +82,64 @@ export default function RightPanel({
         <div className="p-4 max-h-[70vh] overflow-y-auto">
           {tab === 'notas' &&
             (tier === 'pro' ? (
-              notes.length === 0 ? (
+              notes.length === 0 && orphanedAnnotations.length === 0 ? (
                 <p className="text-sm text-ink-400">Aún no tienes notas en esta ley.</p>
               ) : (
-                <ul className="space-y-3">
-                  {notes.map((n) => (
-                    <li key={n.id}>
-                      <a
-                        href={n.sectionId ? `/leyes/${lawSlug}/${n.sectionId}#articulo-${n.articleNumber}` : '#'}
-                        className="block rounded-lg border border-rule p-3 hover:border-gold-400 transition-colors"
-                      >
-                        <p className="text-[10px] font-semibold uppercase tracking-widest text-ink-400 mb-1">
-                          Art. {n.articleNumber}{n.articleHeading ? ` — ${n.articleHeading}` : ''}
-                        </p>
-                        <p
-                          className="text-xs text-ink-700 italic mb-2 line-clamp-2 px-1 rounded-sm"
-                          style={{ backgroundColor: HL_COLORS[n.color] }}
-                        >
-                          “{n.quote}”
-                        </p>
-                        <p className="text-sm text-ink-900">{n.note}</p>
-                      </a>
-                    </li>
-                  ))}
-                </ul>
+                <div className="space-y-4">
+                  {notes.length > 0 && (
+                    <ul className="space-y-3">
+                      {notes.map((n) => (
+                        <li key={n.id}>
+                          <a
+                            href={n.sectionId ? `/leyes/${lawSlug}/${n.sectionId}#articulo-${n.articleNumber}` : '#'}
+                            className="block rounded-lg border border-rule p-3 hover:border-gold-400 transition-colors"
+                          >
+                            <p className="text-[10px] font-semibold uppercase tracking-widest text-ink-400 mb-1">
+                              Art. {n.articleNumber}{n.articleHeading ? ` — ${n.articleHeading}` : ''}
+                            </p>
+                            <p
+                              className="text-xs text-ink-700 italic mb-2 line-clamp-2 px-1 rounded-sm"
+                              style={{ backgroundColor: HL_COLORS[n.color] }}
+                            >
+                              “{n.quote}”
+                            </p>
+                            <p className="text-sm text-ink-900">{n.note}</p>
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+
+                  {orphanedAnnotations.length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-ink-400 mb-2">
+                        Texto modificado
+                      </p>
+                      <ul className="space-y-3">
+                        {orphanedAnnotations.map((o) => (
+                          <li key={o.id}>
+                            <a
+                              href={o.sectionId ? `/leyes/${lawSlug}/${o.sectionId}#articulo-${o.articleNumber}` : '#'}
+                              className="block rounded-lg border border-amber-300 bg-amber-50 p-3 hover:border-amber-400 transition-colors"
+                            >
+                              <p className="text-[10px] font-semibold uppercase tracking-widest text-ink-400 mb-1">
+                                Art. {o.articleNumber}{o.articleHeading ? ` — ${o.articleHeading}` : ''}
+                              </p>
+                              <p
+                                className="text-xs text-ink-700 italic mb-2 line-clamp-2 px-1 rounded-sm"
+                                style={{ backgroundColor: HL_COLORS[o.color] }}
+                              >
+                                “{o.quote}”
+                              </p>
+                              {o.note && <p className="text-sm text-ink-900 mb-1">{o.note}</p>}
+                              <p className="text-[10px] text-amber-700 font-medium">El texto cambió</p>
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
               )
             ) : (
               <div className="text-center py-4">

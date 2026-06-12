@@ -2,35 +2,16 @@ import { createServerSupabaseClient } from "@/lib/supabase-server";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import type { Law, Section, Article, SectionNode } from "@/lib/types";
+import type { SectionNode } from "@/lib/types";
+import { getLawMeta, getLawToc } from "@/lib/services/queries/reading";
 
 type Props = { params: Promise<{ slug: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const supabase = await createServerSupabaseClient();
-  const { data } = await supabase
-    .from("laws")
-    .select("short_name")
-    .eq("slug", slug)
-    .single();
-  return { title: data ? `${data.short_name} — LexGT` : "LexGT" };
-}
-
-function buildTree(sections: Section[]): SectionNode[] {
-  const map = new Map<string, SectionNode>();
-  for (const s of sections) map.set(s.id, { ...s, children: [] });
-
-  const roots: SectionNode[] = [];
-  for (const s of sections) {
-    const node = map.get(s.id)!;
-    if (s.parent_id && map.has(s.parent_id)) {
-      map.get(s.parent_id)!.children.push(node);
-    } else {
-      roots.push(node);
-    }
-  }
-  return roots;
+  const meta = await getLawMeta(supabase, slug);
+  return { title: meta ? `${meta.shortName} — LexGT` : "LexGT" };
 }
 
 const KIND_LABEL: Record<string, string> = {
@@ -122,39 +103,11 @@ export default async function LawTocPage({ params }: Props) {
   const { slug } = await params;
   const supabase = await createServerSupabaseClient();
 
-  const { data: lawRow } = await supabase
-    .from("laws")
-    .select("*")
-    .eq("slug", slug)
-    .single();
+  const toc = await getLawToc(supabase, slug);
+  if (!toc) notFound();
 
-  const law = lawRow as Law | null;
-  if (!law) notFound();
-
-  const { data: sectionsRaw, error: sectionsError } = await supabase
-    .from("sections")
-    .select("*")
-    .eq("law_id", law.id)
-    .order("position");
-
-  if (sectionsError) throw new Error(sectionsError.message);
-
-  const sections = (sectionsRaw as Section[]) ?? [];
-  const hasSections = sections.length > 0;
-
-  let directArticles: Article[] = [];
-  if (!hasSections) {
-    const { data: articles, error: articlesError } = await supabase
-      .from("articles")
-      .select("id, number, heading, position")
-      .eq("law_id", law.id)
-      .eq("is_current", true)
-      .order("position");
-    if (articlesError) throw new Error(articlesError.message);
-    directArticles = (articles as Article[]) ?? [];
-  }
-
-  const tree = hasSections ? buildTree(sections) : [];
+  const { law, tree, directArticles } = toc;
+  const hasSections = tree.length > 0;
 
   return (
     <div className="min-h-screen bg-white">

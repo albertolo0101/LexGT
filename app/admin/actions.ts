@@ -46,6 +46,18 @@ export async function approveReform(reformId: string): Promise<ActionResult<void
   return result
 }
 
+export async function correctParagraphText(data: {
+  paragraphId: string
+  newText: string
+}): Promise<ActionResult<{ reanchored: number; orphaned: number }>> {
+  return runAction(async () => {
+    const supabase = await createServerSupabaseClient()
+    const actor = await getActor(supabase)
+    const input = adminService.CorrectParagraphTextInput.parse(data)
+    return adminService.correctParagraphText(supabase, actor, input)
+  })
+}
+
 export async function setUserTier(data: {
   email: string
   tier: AuthedTier

@@ -4,12 +4,17 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Actor } from "@/lib/authz";
 import { requireUser, AuthzError } from "@/lib/authz";
 import { ActionError } from "@/lib/action-result";
+import { textChecksum } from "@/lib/anchoring";
+import type { AnchorStatus } from "@/lib/types";
 
 export const SaveAnnotationInput = z.object({
   paragraph_id: z.string(),
   article_id: z.string(),
   char_start: z.number().int().nonnegative(),
   char_end: z.number().int().nonnegative(),
+  quote: z.string(),
+  prefix: z.string().nullable().optional(),
+  suffix: z.string().nullable().optional(),
   color: z.string().optional(),
   note: z.string().nullable().optional(),
 });
@@ -26,6 +31,19 @@ export async function saveAnnotation(
   if (color !== "yellow" && actor.tier !== "pro") {
     throw new AuthzError("PRO_REQUIRED", "Pro plan required for colored highlights");
   }
+  if (input.note != null && actor.tier !== "pro") {
+    throw new AuthzError("PRO_REQUIRED", "Esta función requiere el plan Pro.");
+  }
+
+  const { data: paragraph, error: paragraphError } = await db
+    .from("paragraphs")
+    .select("text")
+    .eq("id", input.paragraph_id)
+    .single();
+  if (paragraphError) throw paragraphError;
+  if (!paragraph) throw new ActionError("NOT_FOUND", "Paragraph not found");
+
+  const checksum = await textChecksum((paragraph as { text: string }).text);
 
   const { error } = await db.from("annotations").insert({
     user_id: actor.userId,
@@ -35,7 +53,43 @@ export async function saveAnnotation(
     char_end: input.char_end,
     color,
     note: input.note ?? null,
+    quote: input.quote,
+    prefix: input.prefix ?? null,
+    suffix: input.suffix ?? null,
+    text_checksum: checksum,
+    anchor_status: "anchored",
   });
+  if (error) throw error;
+}
+
+export const ReanchorAnnotationInput = z.object({
+  id: z.string(),
+  char_start: z.number().int().nonnegative(),
+  char_end: z.number().int().nonnegative(),
+  text_checksum: z.string(),
+  anchor_status: z.enum(["anchored", "reanchored", "orphaned"] as const satisfies readonly AnchorStatus[]),
+});
+export type ReanchorAnnotationInput = z.infer<typeof ReanchorAnnotationInput>;
+
+// Lazily persists the result of a client-side resolveAnchor() call so the
+// next read picks up the corrected offsets without re-scanning the text.
+export async function reanchorAnnotation(
+  db: SupabaseClient,
+  actor: Actor,
+  input: ReanchorAnnotationInput
+): Promise<void> {
+  if (!actor.userId) return;
+
+  const { error } = await db
+    .from("annotations")
+    .update({
+      char_start: input.char_start,
+      char_end: input.char_end,
+      text_checksum: input.text_checksum,
+      anchor_status: input.anchor_status,
+    })
+    .eq("id", input.id)
+    .eq("user_id", actor.userId);
   if (error) throw error;
 }
 

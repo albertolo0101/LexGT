@@ -6,7 +6,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 // match the sequence of calls made by the service under test.
 export function makeBuilder(result: { data?: unknown; error?: unknown } = { data: null, error: null }) {
   const builder: Record<string, unknown> = {};
-  const chain = ["insert", "update", "delete", "upsert", "select", "eq", "order", "limit"];
+  const chain = ["insert", "update", "delete", "upsert", "select", "eq", "order", "limit", "in", "not", "is", "gte", "textSearch"];
   for (const method of chain) {
     builder[method] = vi.fn(() => builder);
   }

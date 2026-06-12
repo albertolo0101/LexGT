@@ -3,7 +3,7 @@ import type { Actor } from "@/lib/authz";
 import { AuthzError } from "@/lib/authz";
 import { ActionError } from "@/lib/action-result";
 import { makeBuilder, makeDb } from "@/lib/test/mock-supabase";
-import { findArticle, setUserTier } from "./admin";
+import { correctParagraphText, findArticle, setUserTier } from "./admin";
 
 const proActor: Actor = { userId: "pro-user", tier: "pro", isAdmin: false };
 const adminActor: Actor = { userId: "admin-user", tier: "pro", isAdmin: true };
@@ -39,6 +39,58 @@ describe("findArticle", () => {
 
     const result = await findArticle(db, adminActor, { lawId: "law1", number: "1" });
     expect(result).toEqual({ articleId: "art1", currentText: "primero\n\nsegundo" });
+  });
+});
+
+describe("correctParagraphText", () => {
+  const annotations = [
+    { id: "ann-uno", char_start: 0, char_end: 3, quote: "Uno", prefix: "", suffix: ". ", text_checksum: "old", anchor_status: "anchored" },
+    { id: "ann-dos", char_start: 5, char_end: 8, quote: "Dos", prefix: "o. ", suffix: ". ", text_checksum: "old", anchor_status: "anchored" },
+    { id: "ann-tres", char_start: 10, char_end: 14, quote: "Tres", prefix: ". ", suffix: ".", text_checksum: "old", anchor_status: "anchored" },
+  ] as const;
+
+  it("rejects non-admin actors", async () => {
+    const db = makeDb([]);
+    await expect(
+      correctParagraphText(db, proActor, { paragraphId: "p1", newText: "Uno.  Dos. Tres." })
+    ).rejects.toBeInstanceOf(AuthzError);
+  });
+
+  it("re-anchors every annotation when the quotes survive a typo fix", async () => {
+    const selectBuilder = makeBuilder({ data: annotations, error: null });
+    const paragraphUpdate = makeBuilder({ data: null, error: null });
+    const annUpdates = annotations.map(() => makeBuilder({ data: null, error: null }));
+    const db = makeDb([selectBuilder, paragraphUpdate, ...annUpdates]);
+
+    const result = await correctParagraphText(db, adminActor, {
+      paragraphId: "p1",
+      newText: "Uno.  Dos. Tres.",
+    });
+
+    expect(result).toEqual({ reanchored: 3, orphaned: 0 });
+    expect(paragraphUpdate.update).toHaveBeenCalledWith({ text: "Uno.  Dos. Tres." });
+    for (const update of annUpdates) {
+      expect(update.update).toHaveBeenCalledWith(
+        expect.objectContaining({ anchor_status: "reanchored" })
+      );
+    }
+  });
+
+  it("orphans the annotation whose sentence was replaced, re-anchors the rest", async () => {
+    const selectBuilder = makeBuilder({ data: annotations, error: null });
+    const paragraphUpdate = makeBuilder({ data: null, error: null });
+    const annUpdates = annotations.map(() => makeBuilder({ data: null, error: null }));
+    const db = makeDb([selectBuilder, paragraphUpdate, ...annUpdates]);
+
+    const result = await correctParagraphText(db, adminActor, {
+      paragraphId: "p1",
+      newText: "Uno. Equis. Tres.",
+    });
+
+    expect(result).toEqual({ reanchored: 2, orphaned: 1 });
+    expect(annUpdates[0].update).toHaveBeenCalledWith(expect.objectContaining({ anchor_status: "reanchored" }));
+    expect(annUpdates[1].update).toHaveBeenCalledWith(expect.objectContaining({ anchor_status: "orphaned" }));
+    expect(annUpdates[2].update).toHaveBeenCalledWith(expect.objectContaining({ anchor_status: "reanchored" }));
   });
 });
 

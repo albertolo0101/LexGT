@@ -28,7 +28,7 @@ Antes de Phase 12 (deploy), se ejecuta `LEXGT_EXECUTION_PLAN.md`:
   `lib/action-result.ts` (`ActionResult<T>`/`runAction`/`ActionError`).
   Las tres `actions.ts` (leyes, casos, admin) y sus consumidores cliente
   reescritos para devolver `ActionResult` en vez de `throw new Error`.
-- ▸ **Phase 3 — Service layer extraction** (en progreso):
+- ✓ **Phase 3 — Service layer extraction**:
   - ✓ Step 3.1 — `lib/services/annotations.ts` (saveAnnotation,
     updateAnnotationNote, deleteAnnotation, migrateAnnotations,
     markReformSeen) con schemas Zod + Vitest.
@@ -37,9 +37,85 @@ Antes de Phase 12 (deploy), se ejecuta `LEXGT_EXECUTION_PLAN.md`:
     `supersedeArticle`), `lib/services/admin.ts` (findArticle,
     setUserTier). `app/leyes/actions.ts`, `app/casos/actions.ts`,
     `app/admin/actions.ts` son wrappers delgados.
-  - [ ] Step 3.3 — read-path query modules (`lib/services/queries/`).
-- [ ] Phases 4-7 (API v1, anchoring v2, testing/CI, module architecture)
-  — ver `LEXGT_EXECUTION_PLAN.md`.
+  - ✓ Step 3.3 — `lib/services/queries/laws.ts` (`getLawCatalog`),
+    `lib/services/queries/reading.ts` (`getLawToc`, `getSectionReadingBundle`,
+    `getLawMeta`, `getSectionMeta`), `lib/services/queries/search.ts`
+    (`searchArticles`). `app/leyes/page.tsx`, `[slug]/page.tsx`,
+    `[slug]/[section_id]/page.tsx`, `app/buscar/page.tsx` y
+    `app/api/search/route.ts` consumen estos módulos — sin `.from(`.
+- ✓ **Phase 4 — Versioned API layer (mobile-readiness)**:
+  - ✓ Step 4.1 — `lib/supabase-bearer.ts` (tercera factory de cliente,
+    `Authorization: Bearer <token>`, RLS aplica vía JWT).
+  - ✓ Step 4.2 — `lib/api/handler.ts` (`apiHandler`: bearer → `getActor` →
+    zod parse → servicio → `{ok,data|code}` + status HTTP), `app/api/v1/{me,
+    annotations,annotations/[id],cases,cases/[id]}/route.ts`,
+    `lib/services/queries/cases.ts` (`listCases`, `getCaseDetail`),
+    `docs/API.md`.
+  - ✓ Step 4.3 — `lib/api/rate-limit.ts` (Upstash Redis, sliding window,
+    fail-open): `searchLimiter` 30/min por IP en `/api/search`, `apiLimiter`
+    60/min por `actor.userId` en `lib/api/handler.ts`. Código `RATE_LIMITED`
+    → 429 en `lib/action-result.ts`.
+- ✓ **Phase 5 — Annotation anchoring v2 (data integrity)**:
+  - ✓ Step 5.1 — `0014_annotation_anchors.sql` (`quote/prefix/suffix/
+    text_checksum/anchor_status` en `annotations`, backfill desde
+    `paragraphs.text` actual; aplicada a prod — 14/14 `anchored`).
+  - ✓ Step 5.2 — `lib/anchoring.ts` (`textChecksum` SHA-256, `resolveAnchor`:
+    checksum → prefix+quote+suffix → quote único → `orphaned`).
+    `saveAnnotation` captura quote/prefix/suffix del cliente y calcula el
+    checksum server-side. `getSectionReadingBundle` resuelve cada highlight
+    contra el texto actual, persiste re-anclajes de forma perezosa, excluye
+    `orphaned` del render inline y los muestra en el panel "Notas" bajo
+    "Texto modificado". `ParagraphHighlighter` envía quote + 32 chars de
+    contexto al guardar.
+  - ✓ Step 5.3 — `lib/services/admin.ts` (`correctParagraphText`): admin-only,
+    actualiza `paragraphs.text` y re-ancla todas las anotaciones de ese
+    párrafo, retorna `{reanchored, orphaned}`. Wrapper en
+    `app/admin/actions.ts`.
+- [ ] **Phase 6 — Testing & CI** (en progreso):
+  - ✓ Step 6.1 — `supabase/tests/database/rls.test.sql` (pgTAP, 15/15 verde
+    vía `npm run test:rls` contra `db reset` desde cero, migraciones
+    0001-0018 + seed). Matriz E1/E2/E3 completa: admin solo vía
+    `app_metadata`, `user_profiles.tier` no auto-actualizable, anotaciones
+    color/nota gateadas por tier, `cases` Pro-only, aislamiento cross-user
+    en annotations/cases/reform_notifications/user_profiles.
+  - ✓ Step 6.2a — `0016_dedupe_paragraphs.sql` (7,369 filas duplicadas de
+    `paragraphs` eliminadas, 3 anotaciones re-apuntadas, constraint
+    `UNIQUE (article_id, position)` agregada — `paragraphs_position_unique`
+    ahora 0 fallos en las 15 leyes), `0017_validate_law_tolerate_derogado.sql`
+    (`articles_have_paragraphs` tolera `heading ILIKE '%derogad%'`),
+    `0018_grant_table_privileges.sql` (gap de schema-reconciliation: grants
+    `anon/authenticated/service_role` faltaban en `db reset` desde cero,
+    prod ya los tenía vía provisioning de Supabase). Las 3 aplicadas a prod.
+  - ⚠️ Step 6.2 (resto) — **fallos restantes son 100% extractor-scope**, ver
+    `LEXGT_EXECUTION_PLAN.md` §6.2: ~1,007 artículos sin párrafos (huecos de
+    contenido reales), 35 pares `sections` con `position` duplicado en 7
+    leyes (bug: contador de `position` compartido entre `kind`s en
+    `parent_id=null`), 11 números de artículo duplicados en 3 leyes (bug:
+    extractor descarta sufijos `Bis/Ter/Quater`, ej. 4 artículos distintos
+    todos como "152" en `ley-organica-del-organismo-legislativo`). **No
+    marcar 6.2 como hecho** — diferido a la sesión de fix del extractor
+    (después de Phase 7). **Bloquea Phase 12 (deploy)** igual que Step 6.3.
+  - ✓ Step 6.3 — `.github/workflows/ci.yml` (tsc → lint → vitest → build,
+    placeholder Supabase env vars). `playwright.config.ts` +
+    `tests/e2e/smoke.spec.ts`: dos tests anónimos pasan localmente
+    (lectura de artículo, ⌘K → resultado → `#articulo-N`); dos tests de
+    usuario free (highlight persiste, panel Notas → paywall) están escritos
+    pero `test.skip` salvo que se definan `PLAYWRIGHT_FREE_USER_EMAIL`/
+    `PLAYWRIGHT_FREE_USER_PASSWORD` — **requiere que Beto cree una cuenta
+    free de prueba** (no se ejecutan en CI todavía, solo local vía `npm run
+    test:e2e`).
+- ✓ **Phase 7 — Module architecture (design + scaffold)**:
+  - ✓ Step 7.1 — `docs/MODULES.md` (convención: `lib/modules/<name>/{service.ts,
+    schemas.ts, README.md}` + `app/api/v1/<name>/`; nunca importado desde
+    `app/leyes`/`components`/`lib/services/queries`; tablas con prefijo +
+    RLS + `is_pro()` igual que Phase 1; regla de cómputo síncrono-en-route
+    vs. worker Railway+`jobs` table para async/pesado).
+    `lib/modules/README.md` (scaffold).
+  - ✓ Step 7.2 — `lib/modules/calc-laboral/` (`calculateIndemnizacion`, Art.
+    82 Código de Trabajo, conteo 30/360, zod `IndemnizacionInput`/
+    `IndemnizacionResult`, 4 tests unitarios), `POST /api/v1/calc-laboral`
+    (Pro-gated vía `requirePro`, sin tabla/UI). Documentado en `docs/API.md`.
+    `grep -r "lib/modules" app/leyes components lib/services/queries` vacío.
 
 Fases del roadmap original siguen después: Phase 12 (deploy Vercel), Phase 13
 (jurisprudencias — Railway + Playwright), Phase 14 (pagos Visanet), Phase 15 (React Native).
@@ -66,48 +142,92 @@ Ver `docs/SECURITY.md` para la matriz completa tabla × operación × política 
 
 ## Last Session
 
-Ejecutado Phase 3, Steps 3.1 y 3.2 de `LEXGT_EXECUTION_PLAN.md` (Step 3.3
-queda pendiente).
+**Phase 7 completa** (module architecture — diseño + scaffold):
 
-- **Setup**: instalado `zod` y `vitest` (`npm test` → `vitest run`),
-  `vitest.config.ts` con alias `@` y stub de `server-only` (no resoluble en
-  Node) en `lib/test/empty-module.ts`. Helper compartido de mocks de Supabase
-  en `lib/test/mock-supabase.ts` (`makeBuilder`/`makeDb`, query builder
-  encadenable + `rpc`).
-- **Step 3.1**: nuevo `lib/services/annotations.ts` — `saveAnnotation`,
-  `updateAnnotationNote`, `deleteAnnotation`, `migrateAnnotations`,
-  `markReformSeen`, cada uno con su schema Zod (`SaveAnnotationInput`, etc.)
-  y firma `(db, actor, input)`. `app/leyes/actions.ts` ahora son wrappers
-  delgados: `getActor` → `Schema.parse` → service → `runAction`. 15 tests en
-  `lib/services/annotations.test.ts`.
-- **Step 3.2**: mismo patrón para `lib/services/cases.ts` (createCase,
-  deleteCase, addAnnotationToCase, removeAnnotationFromCase),
-  `lib/services/reforms.ts` (publishReform, createReformDraft, approveReform
-  — todas comparten el helper privado `supersedeArticle` para no duplicar la
-  lógica de "nueva versión de artículo + paragraphs + marcar superseded"),
-  y `lib/services/admin.ts` (findArticle, setUserTier). `app/casos/actions.ts`
-  y `app/admin/actions.ts` reescritos como wrappers delgados (~60 líneas cada
-  uno); `publishReform` se movió de `app/leyes/actions.ts` a
-  `lib/services/reforms.ts` (el wrapper sigue en `leyes/actions.ts`, sigue
-  pareciendo código muerto). 20 tests adicionales en
-  `lib/services/{cases,reforms,admin}.test.ts` (35 totales).
+- ✓ Step 7.1 — `docs/MODULES.md`: convención de módulos (`lib/modules/<name>/
+  {service.ts, schemas.ts, README.md}` + `app/api/v1/<name>/`), regla dura de
+  aislamiento (nunca importado desde `app/leyes`/`components`/
+  `lib/services/queries`), tablas con prefijo + RLS + `is_pro()` (mismo
+  patrón Phase 1), regla de cómputo (síncrono-en-route vs. worker
+  Railway+`jobs` table para async/pesado, uploads sensibles a Storage
+  privado). `lib/modules/README.md` scaffold.
+- ✓ Step 7.2 — `lib/modules/calc-laboral/`: `calculateIndemnizacion` (Art. 82
+  Código de Trabajo, indemnización por despido injustificado, conteo 30/360),
+  zod `IndemnizacionInput`/`IndemnizacionResult`, `service.test.ts` (4 casos:
+  rechazo free, año exacto, prorrateo 30/360, duración cero). `POST
+  /api/v1/calc-laboral` vía `apiHandler` + `requirePro` (sin tabla, sin UI).
+  Documentado en `docs/API.md`. Verificado: `tsc --noEmit`, `npm run test`
+  (67/67), `npx eslint`, `npm run build --turbopack` todos verdes;
+  `grep -r "lib/modules" app/leyes components lib/services/queries` vacío.
 
-`npx vitest run` → 35/35 verde. `npx tsc --noEmit` limpio. `npm run build
---turbopack` pasa (14 rutas). Verificado por grep: `lib/services/` no importa
-`next/*`; ningún `actions.ts` contiene `throw new Error(`. Smoke test con
-servidor dev limpio (`.next` borrado): `/leyes`→200, `/casos`→200,
-`/admin`→307 (redirect esperado para no-admin).
+Próxima sesión: **sesión de fix del extractor**
+(`PDFtoSQLapp/pdf-sql-LEX/lex-extractor`) — sufijos `Bis/Ter/Quater` en
+`articles.number`, contador de `position` por `(parent_id, kind)` en
+`sections`, investigar los ~1,007 artículos sin párrafos, agregar un
+post-load step que corra `validate_law()` por ley (ver
+`LEXGT_EXECUTION_PLAN.md` §6.2 y memoria `project_data_quality` para el
+detalle completo de cada hallazgo). Después de eso, retomar el roadmap
+general (Phase 12 deploy, etc.).
 
-Próxima sesión: Step 3.3 (read-path query modules —
-`lib/services/queries/{laws,reading,search}.ts`, refactor de
-`app/leyes/page.tsx`, `[slug]/page.tsx`, `[slug]/[section_id]/page.tsx`,
-`app/api/search/route.ts`).
+---
+
+<details>
+<summary>Sesión anterior — Phase 6.1 / 6.2a</summary>
+
+Docker instalado por Beto → se completaron Phase 6.1 y Phase 6.2a (la parte
+de 6.2 que no requiere tocar el extractor).
+
+- **Phase 6.1** — `supabase init` + `supabase start` (stack local Docker) +
+  `supabase db reset` (migraciones 0001-0018 + seed). Escrito
+  `supabase/tests/database/rls.test.sql` (pgTAP, `plan(15)`): seeds
+  `free@test`/`pro@test`/`expired@test`/`admin@test`/`other@test`/
+  `target@test` (6 usuarios — el 6to, `target@test`, evita que el assert de
+  "admin puede actualizar el tier de otro usuario" mute el fixture del
+  usuario free usado por los tests de E3). Matriz E1 (admin solo vía
+  `app_metadata`), E2 (`user_profiles.tier` no auto-actualizable / sí por
+  admin), E3 (color/nota de anotaciones gateado por tier — yellow+sin nota
+  para free, cualquier color+nota para pro, expired-pro tratado como free;
+  `cases` Pro-only), aislamiento cross-user (annotations/cases/
+  reform_notifications/user_profiles → 0 filas). `npm run test:rls` → **15/15
+  verde**. `0018_grant_table_privileges.sql` (gap encontrado: `db reset` desde
+  cero no otorga SELECT/INSERT/UPDATE/DELETE a `anon`/`authenticated`/
+  `service_role` en ninguna tabla — solo TRIGGER/TRUNCATE/REFERENCES; prod sí
+  los tiene vía provisioning de Supabase) — aplicada a prod.
+
+- **Phase 6.2a** — `0016_dedupe_paragraphs.sql` (re-apunta las 3 anotaciones
+  afectadas a la fila "kept", borra las 7,369 filas duplicadas de
+  `paragraphs`, agrega `UNIQUE (article_id, position)` —
+  `paragraphs_position_unique` ahora 0 fallos en las 15 leyes) y
+  `0017_validate_law_tolerate_derogado.sql` (`articles_have_paragraphs`
+  tolera `heading ILIKE '%derogad%'`) — ambas **aplicadas a prod** y
+  verificadas re-corriendo `validate_law()`.
+
+- **Hallazgos restantes (100% extractor-scope, ver `LEXGT_EXECUTION_PLAN.md`
+  §6.2)** — diferidos a la sesión de fix del extractor (después de Phase 7):
+  - ~1,007 artículos sin párrafos (huecos de contenido reales).
+  - 35 pares `sections` con `(parent_id, position)` duplicado en 7 leyes —
+    causa raíz confirmada: el extractor usa un único contador de `position`
+    compartido entre todos los `kind` (titulo/capitulo/seccion/subseccion)
+    bajo `parent_id=null`, en vez de uno por `(parent_id, kind)`.
+  - 11 números de artículo duplicados en 3 leyes — causa raíz confirmada: el
+    extractor descarta sufijos `Bis/Ter/Quater` (ej. 4 artículos con headings
+    totalmente distintos — "Publicaciones del Congreso", "Publicidad e
+    información", "Disponibilidad de información en Internet", "Consulta
+    electrónica" — todos guardados como artículo `152` en
+    `ley-organica-del-organismo-legislativo`).
+
+**Pendiente de Beto:**
+- Crear una cuenta de prueba tier `free` y exportar
+  `PLAYWRIGHT_FREE_USER_EMAIL`/`PLAYWRIGHT_FREE_USER_PASSWORD` para
+  habilitar los 2 tests e2e autenticados.
+
+</details>
 
 ---
 
 ## Key Decisions
 
-1. **`supabase.ts` vs `supabase-server.ts` separados** — `next/headers` rompe Client Components. Browser client en `lib/supabase.ts`, server client en `lib/supabase-server.ts`. No mezclar.
+1. **Tres factories de cliente Supabase, no mezclar** — `lib/supabase.ts` (browser, Client Components), `lib/supabase-server.ts` (cookie-bound, Server Components/Actions; `next/headers` rompe Client Components), `lib/supabase-bearer.ts` (Bearer token, solo `app/api/v1/*` para mobile — RLS aplica igual vía el JWT del header `Authorization`).
 2. **`sections.kind` en español** — valores: `libro/titulo/capitulo/seccion/parte/parrafo/subseccion/articulo/disposiciones`. Columna es `heading`, no `title`.
 3. **`public.is_admin()`** — en schema `public`, no `auth` (Supabase no permite CREATE en `auth`).
 4. **Server Actions para mutaciones** — signOut, saveAnnotation, deleteAnnotation, migrateAnnotations, markReformSeen, publishReform, createReformDraft, approveReform, setUserTier.
@@ -117,18 +237,19 @@ Próxima sesión: Step 3.3 (read-path query modules —
 8. **Modos de navegación — colecciones curadas** — `law_collections` + `law_collection_items` con RLS pública. `law_id` es UUID (no integer). Modos "Caso" se derivan en runtime desde `case_annotations`, sin tabla adicional. Modo activo guardado en localStorage.
 9. **Ventana de reformas por tier** — anónimo 7 días, free 1 mes, pro 6 meses.
 10. **Content Extractor** — proyecto separado en `PDFtoSQLapp/pdf-sql-LEX/lex-extractor`. Genera SQL idempotente (`ON CONFLICT DO NOTHING`). Ver `SCHEMA_CONTEXT.md` en ese repo para bugs pendientes. Conexión: Session Pooler en `aws-1-us-east-1.pooler.supabase.com:5432`.
-11. **Admin role** — `user_metadata.role = 'admin'` en Supabase dashboard. Doble protección: middleware + layout.
+11. **Admin role** — `app_metadata.role = 'admin'` (Supabase dashboard, no autoescribible). Doble protección: middleware + layout.
 
 ---
 
 ## Token Rules
 
-- Credenciales en `.env.local` (no commiteado). Variables: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
+- Credenciales en `.env.local` (no commiteado). Variables: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` (ver `.env.example`). Si las de Upstash faltan, rate limiting queda deshabilitado (fail-open) con un warning en consola.
 - Nunca usar `Header.tsx` — está reemplazado por `AppShell`/`ShellClient`. El header vive dentro de `ShellClient`.
 - `getUserTier(supabase)` es server-only — recibe el cliente existente, no crea uno nuevo.
-- Las migraciones van en `supabase/migrations/` con nombre `000N_descripcion.sql`. Ya aplicadas hasta `0008_collections.sql`.
+- Las migraciones van en `supabase/migrations/` con nombre `000N_descripcion.sql`. Ya aplicadas hasta `0018_grant_table_privileges.sql`.
 - Seeds idempotentes: siempre usar `ON CONFLICT DO NOTHING` o `INSERT … WHERE NOT EXISTS`.
 - `dev`: `npm run dev` (Turbopack). Build: `npm run build --turbopack`.
+- RLS pgTAP suite: `npm run test:rls` (requiere `supabase start` corriendo localmente — stack Docker).
 
 ---
 
@@ -139,7 +260,14 @@ app/
   layout.tsx                    → root layout — monta <AppShell>
   page.tsx                      → redirect a /leyes
   globals.css
-  api/search/route.ts           → GET /api/search?q=&law=&limit= (full-text)
+  api/search/route.ts           → GET /api/search?q=&law=&limit= (full-text, rate-limited)
+  api/v1/
+    me/route.ts                  → GET /api/v1/me (actor: userId/tier/isAdmin)
+    annotations/route.ts         → POST /api/v1/annotations
+    annotations/[id]/route.ts    → PATCH (nota), DELETE
+    cases/route.ts               → GET (lista), POST (crear)
+    cases/[id]/route.ts          → GET (detalle), DELETE
+    calc-laboral/route.ts        → POST indemnización Art. 82 (Pro, Phase 7)
   buscar/page.tsx               → página de resultados full-text
   leyes/
     page.tsx                    → lista de leyes + badges de reformas pendientes
@@ -176,9 +304,28 @@ components/
 lib/
   supabase.ts                   → createClient() — browser ONLY
   supabase-server.ts            → createServerSupabaseClient() — server only
+  supabase-bearer.ts            → createBearerClient(accessToken) — solo app/api/v1/*
   get-user-tier.ts              → getUserTier(supabase): Promise<Tier> — server-only
-  types.ts                      → Law, Section, Article, Paragraph, Annotation, Case,
+  authz.ts                      → getActor/requireUser/requirePro/requireAdmin/AuthzError
+  action-result.ts              → ActionResult<T>/runAction/ActionError (incluye RATE_LIMITED)
+  anchoring.ts                  → textChecksum (SHA-256), resolveAnchor, ANCHOR_CONTEXT_LENGTH (Phase 5)
+  types.ts                      → Law, Section, Article, Paragraph, Annotation, AnchorStatus, Case,
                                    LawCollection, LawCollectionItem, Tier, UserProfile, etc.
+  api/
+    handler.ts                  → apiHandler(fn) — wrapper de app/api/v1/* (auth, rate limit, errores)
+    rate-limit.ts                → searchLimiter/apiLimiter (Upstash, sliding window, fail-open)
+  services/
+    annotations.ts, cases.ts, reforms.ts, admin.ts → lógica de mutaciones (Phase 3.1-3.2)
+    queries/
+      laws.ts                    → getLawCatalog (lista de leyes + reformas + conteos)
+      reading.ts                 → getLawToc, getSectionReadingBundle, getLawMeta, getSectionMeta
+      search.ts                  → searchArticles (full-text articles+paragraphs)
+      cases.ts                   → listCases, getCaseDetail (Phase 4.2)
+  modules/                       → Phase 7 — herramientas Pro aisladas del core, ver docs/MODULES.md
+    calc-laboral/
+      schemas.ts                  → IndemnizacionInput/IndemnizacionResult (zod)
+      service.ts                  → calculateIndemnizacion (Art. 82 Código de Trabajo, 30/360)
+      service.test.ts             → 4 casos (rechazo free, año exacto, prorrateo, duración cero)
 
 middleware.ts                   → refresca cookie; protege /admin/* (redirige si no es admin)
 
@@ -192,10 +339,32 @@ supabase/
     0006_cases.sql              → cases + case_annotations (many-to-many, FK cascade)
     0007_search.sql             → search_vector tsvector, índices GIN, triggers, backfill
     0008_collections.sql        → law_collections + law_collection_items + 7 colecciones seeded
+    0009_schema_reconciliation.sql → sections.kind ampliado, índices duplicados eliminados
+    0010_admin_app_metadata.sql → is_admin() lee app_metadata.role (E1)
+    0011_lock_user_profiles.sql → owner UPDATE eliminado, trigger prevent_tier_self_update (E2)
+    0012_tier_enforcement.sql   → current_user_tier()/is_pro(), WITH CHECK en annotations/cases (E3)
+    0013_function_search_path_hardening.sql → set search_path en is_admin/is_pro/prevent_tier_self_update
+    0014_annotation_anchors.sql → quote/prefix/suffix/text_checksum/anchor_status en annotations + backfill
+    0015_validate_law.sql       → public.validate_law(law_slug) — gate de validación de contenido (Phase 6.2)
+    0016_dedupe_paragraphs.sql  → elimina 7,369 paragraphs duplicados, re-apunta 3 annotations, UNIQUE (article_id, position)
+    0017_validate_law_tolerate_derogado.sql → articles_have_paragraphs tolera heading ILIKE '%derogad%'
+    0018_grant_table_privileges.sql → grants anon/authenticated/service_role en todas las tablas (paridad con prod)
   seed.sql                      → Código Civil completo
   seeds/
     test_reform.sql             → reforma ficticia para pruebas
+  tests/
+    database/rls.test.sql       → pgTAP RLS suite (E1/E2/E3 + cross-user isolation), 15/15 — npm run test:rls
+
+.github/
+  workflows/ci.yml               → tsc → lint → vitest → build (push/PR a main)
+
+playwright.config.ts             → e2e config (webServer: npm run dev, baseURL localhost:3000)
+tests/
+  e2e/smoke.spec.ts               → smoke tests anónimos (✓) + free user (skip sin credenciales)
 ```
 
 **Archivos de contexto en este repo (no borrar):**
-- `CONTEXT.md` — fuente original de este CLAUDE.md; contiene checklist de 121 leyes y estado detallado por fase. Mantener actualizado en paralelo o migrar completamente aquí.
+- `docs/SECURITY.md` — matriz tabla × operación × política RLS (Phase 1).
+- `docs/API.md` — endpoints `/api/v1/*`, auth, shapes de respuesta, rate limiting (Phase 4).
+- `docs/MODULES.md` — convención de módulos Pro aislados del core (Phase 7).
+- `supabase/SCHEMA_SNAPSHOT.md` — snapshot del schema post-migración 0009 (Phase 0).
