@@ -1,11 +1,38 @@
-# LexGT — Checklist de contenido (121 leyes)
+# Contenido — checklist de leyes (121 ítems)
 
-Leyenda: ✅ en DB y seeded | ⚠️ placeholder (reemplazar) | ⏳ pendiente
+Leyenda: ✅ en DB | ⏳ pendiente
 
-**Progreso: 13/121 ítems en DB ✅ — 108/121 pendientes ⏳**
-_(Ítem #1 son 3 leyes separadas. Además se cargó Ley General de Electricidad fuera del checklist.)_
+**Progreso: 13/121 ítems del checklist en DB — 16 leyes cargadas.**
+_(El ítem #1 son 3 leyes separadas. Además está cargada la Ley General de
+Electricidad, fuera del checklist.)_
 
-**Flujo de carga:** proyecto separado `PDFtoSQLapp/pdf-sql-LEX/lex-extractor` procesa PDFs/Word/texto y genera SQL idempotente (`ON CONFLICT DO NOTHING`). Ver `SCHEMA_CONTEXT.md` en ese repo para bugs pendientes del extractor.
+## Cómo entra el contenido
+
+El repo hermano `lex-extractor` (`PDFtoSQLapp/pdf-sql-LEX/lex-extractor`) es
+el **plano de control editorial**: procesa PDFs/Word/texto, estructura la ley
+y genera SQL idempotente (`ON CONFLICT DO NOTHING`) que se aplica a Supabase.
+LexGT es el lector — aquí no se editan leyes a mano.
+
+Tres caminos, y solo tres:
+
+| Situación | Camino |
+|---|---|
+| Ley nueva | `insert.sql` del extractor |
+| La ley cambió de verdad | Reforma: `createReformDraft` → aprobar en `/admin/reformas/[id]` → nueva versión del artículo |
+| La extracción salió mal (typo, texto malo) | `correctParagraphText` (admin) — corrige en sitio y re-ancla las anotaciones |
+
+Un `UPDATE` crudo a `articles`/`paragraphs` rompe tres cosas a la vez: la
+cadena de versiones, la notificación de reforma que ven los usuarios, y el
+anclaje de las anotaciones (`text_checksum` deja de coincidir → highlights
+huérfanos).
+
+## Calidad de los datos cargados
+
+`public.validate_law('<slug>')` es el gate: 10 checks por ley (secciones,
+posiciones, artículos con párrafos, numeración única, search vectors). Hoy 4
+de 16 leyes pasan limpio; el resto arrastra huecos de extracción cuyos bugs
+ya están corregidos en el extractor pero cuya recarga por ley todavía no
+existe. Detalle y siguiente paso en [ROADMAP.md](ROADMAP.md) §Datos.
 
 ---
 
@@ -111,7 +138,7 @@ _(Ítem #1 son 3 leyes separadas. Además se cargó Ley General de Electricidad 
 | 76 | Ley del Tribunal de Cuentas | ⏳ | ⏳ |
 | 77 | Ley del Impuesto de Solidaridad (ISO) | ⏳ | ⏳ |
 | 78 | Ley de Actualización Tributaria (ISR) | ⏳ | ⏳ |
-| 79 | Ley Orgánica de la SAT | ⏳ | ⏳ |
+| 79 | Ley Orgánica de la SAT | ✅ | ✅ |
 | 80 | Disposiciones Legales para el Fortalecimiento de la Administración Tributaria | ⏳ | ⏳ |
 | 81 | Ley Orgánica del IGSS | ⏳ | ⏳ |
 | 82 | Ley de la Carrera Judicial | ⏳ | ⏳ |

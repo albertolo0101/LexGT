@@ -40,6 +40,7 @@ mensajes de error amigables, pero nunca son la única barrera.
 | `user_profiles` | dueño | admin (`is_admin()`) | admin (`is_admin()`); trigger `prevent_tier_self_update` bloquea cambios a `tier`/`tier_expires_at`/`tier_source` salvo admin | — |
 | `cases` | dueño | dueño **y** `is_pro()` | dueño (using); dueño **y** `is_pro()` (check) | dueño |
 | `case_annotations` | dueño del `case` referenciado | dueño del case **y** `is_pro()` | dueño del case (using); dueño **y** `is_pro()` (check) | dueño del case |
+| `law_fragments` | admin | admin | admin | admin |
 | `law_reforms` | público | admin | admin | — |
 | `reform_draft_articles` | admin | admin | admin | admin |
 | `reform_notifications` | dueño | dueño | — | — |
@@ -87,3 +88,40 @@ tier.
 | E1 | Auto-otorgarse `role: 'admin'` vía `user_metadata` | `0010_admin_app_metadata.sql`, `middleware.ts`, `app/admin/layout.tsx`, `app/admin/actions.ts` |
 | E2 | `PATCH user_profiles` para auto-asignarse `tier='pro'` | `0011_lock_user_profiles.sql` |
 | E3 | INSERT directo de anotaciones/casos Pro vía PostgREST con anon key | `0012_tier_enforcement.sql` |
+
+Los tres están cubiertos por la suite pgTAP `supabase/tests/database/
+rls.test.sql` (`npm run test:rls`, 15/15). Cualquier cambio a políticas o
+triggers debe correrla antes de aplicarse a prod.
+
+---
+
+## Integridad del texto legal
+
+`paragraphs.text` **no se actualiza en crudo**. Un `UPDATE` directo rompe a
+la vez la cadena de versiones del artículo, la notificación de reforma que
+ven los usuarios y el anclaje de las anotaciones (`text_checksum` deja de
+coincidir → highlights huérfanos). Los dos caminos válidos:
+
+- **Corrección de extracción** (typo, texto mal parseado) →
+  `correctParagraphText` en `lib/services/admin.ts`: admin-only, actualiza el
+  texto y re-ancla todas las anotaciones del párrafo, devolviendo
+  `{reanchored, orphaned}`.
+- **La ley cambió de verdad** → flujo de reformas (`createReformDraft` →
+  aprobación en `/admin/reformas/[id]` → nueva versión del artículo).
+
+---
+
+## Advisors de Supabase (revisados 2026-08-31)
+
+- `admin_find_user_by_email` aparece como `SECURITY DEFINER` ejecutable por
+  `anon`/`authenticated`: **benigno**, la función valida
+  `app_metadata.role = 'admin'` en su primera línea y lanza `Not authorized`
+  en cualquier otro caso.
+- `current_user_tier()` y `handle_new_user()` son `SECURITY DEFINER` por
+  diseño (leen `user_profiles` / escriben la fila de perfil) y no exponen
+  datos de otros usuarios.
+- `update_article_search_vector` / `update_paragraph_search_vector` no tienen
+  `search_path` fijo (WARN). Son triggers internos sin superficie de llamada
+  externa; endurecerlos es un pendiente menor.
+- **Leaked password protection está desactivado** en Supabase Auth —
+  activarlo antes de abrir el registro al público.
