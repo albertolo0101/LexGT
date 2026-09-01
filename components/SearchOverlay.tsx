@@ -15,6 +15,14 @@ type SearchResult = {
   section_id: string
 }
 
+type LawHit = {
+  law_id: string
+  slug: string
+  short_name: string
+  full_name: string
+  decree: string | null
+}
+
 export default function SearchOverlay({
   tier,
   onClose,
@@ -26,6 +34,7 @@ export default function SearchOverlay({
 }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
+  const [laws, setLaws] = useState<LawHit[]>([])
   const [loading, setLoading] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
@@ -46,6 +55,7 @@ export default function SearchOverlay({
     const q = query.trim()
     if (q.length < 2) {
       setResults([])
+      setLaws([])
       setLoading(false)
       return
     }
@@ -53,7 +63,10 @@ export default function SearchOverlay({
     const timer = setTimeout(() => {
       fetch(`/api/search?q=${encodeURIComponent(q)}&limit=8`)
         .then((res) => res.json())
-        .then((data) => setResults(data.results ?? []))
+        .then((data) => {
+          setResults(data.results ?? [])
+          setLaws(data.laws ?? [])
+        })
         .finally(() => setLoading(false))
     }, 250)
     return () => clearTimeout(timer)
@@ -110,10 +123,28 @@ export default function SearchOverlay({
             </div>
           ) : loading ? (
             <div className="px-4 py-6 text-center text-sm text-ink-400">Buscando…</div>
-          ) : results.length === 0 ? (
+          ) : results.length === 0 && laws.length === 0 ? (
             <div className="px-4 py-6 text-center text-sm text-ink-400">Sin resultados para “{query}”.</div>
           ) : (
             <ul className="divide-y divide-rule">
+              {laws.map((l) => (
+                <li key={l.law_id}>
+                  <button
+                    onClick={() => {
+                      onClose()
+                      router.push(`/leyes/${l.slug}`)
+                    }}
+                    className="w-full px-4 py-3 text-left transition-colors hover:bg-paper-2"
+                  >
+                    <p className="mb-0.5 flex items-center gap-1.5 text-xs font-semibold text-navy-700">
+                      <Ico.scroll className="h-3.5 w-3.5 text-ink-400" />
+                      {l.short_name}
+                      {l.decree && <span className="font-normal text-ink-400">{l.decree}</span>}
+                    </p>
+                    <p className="line-clamp-1 text-sm text-ink-700">{l.full_name}</p>
+                  </button>
+                </li>
+              ))}
               {results.map((r) => (
                 <li key={r.article_id}>
                   <button

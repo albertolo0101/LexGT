@@ -114,13 +114,32 @@ export default function SidebarContent({
           )}
         </div>
 
-        <div className="mt-1 px-4 py-1.5 flex items-center gap-2 text-ink-400">
-          <Ico.folder className="w-4 h-4" />
-          <span className="text-sm">Jurisprudencias</span>
-          <span className="text-[9px] font-medium border border-dashed border-ink-400/50 rounded px-1.5 py-0.5 leading-none uppercase tracking-wide">
-            Próximamente
-          </span>
-        </div>
+        {tier === 'pro' ? (
+          <Link
+            href="/jurisprudencia"
+            onClick={onNavigate}
+            className={[
+              'mt-1 flex items-center gap-2 px-4 py-1.5 transition-colors',
+              pathname?.startsWith('/jurisprudencia')
+                ? 'bg-navy-50 text-navy-800 font-medium'
+                : 'text-ink-700 hover:bg-paper-2',
+            ].join(' ')}
+          >
+            <Ico.folder className="w-4 h-4 text-ink-400" />
+            <span className="text-sm">Jurisprudencia</span>
+          </Link>
+        ) : (
+          <button
+            onClick={isAuthenticated ? onOpenPaywall : undefined}
+            className="mt-1 flex w-full items-center gap-2 px-4 py-1.5 text-left text-ink-400 transition-colors hover:bg-paper-2"
+          >
+            <Ico.folder className="w-4 h-4" />
+            <span className="text-sm">Jurisprudencia</span>
+            <span className="rounded border border-dashed border-gold-400/60 px-1.5 py-0.5 text-[9px] font-medium uppercase leading-none tracking-wide text-gold-700">
+              Pro
+            </span>
+          </button>
+        )}
       </div>
 
       <div className="border-t border-rule pt-3 pb-4 flex-shrink-0">

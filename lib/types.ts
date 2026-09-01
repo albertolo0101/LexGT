@@ -111,6 +111,43 @@ export type CaseAnnotation = {
   created_at: string
 }
 
+// Jurisprudencia constitucional. El índice sale de la Gaceta Jurisprudencial
+// de la Corte de Constitucionalidad (migración 0022); el texto íntegro vive
+// en el portal de la CC y se enlaza, no se copia.
+export type Jurisprudencia = {
+  id: string
+  expediente: string
+  expedientes: string[]
+  tipo_proceso: string | null
+  tipo_resolucion: string
+  resultado: string | null
+  fecha_sentencia: string
+  sumario: string
+  gaceta: number | null
+  periodo: string | null
+  pagina: number | null
+  source_url: string | null
+}
+
+// Una referencia guardada por el usuario. `jurisprudencia_id` es nulo cuando
+// el expediente todavía no está en el índice y se anotó a mano.
+export type JurisprudenciaRef = {
+  id: string
+  user_id: string
+  jurisprudencia_id: string | null
+  expediente: string
+  fecha_sentencia: string | null
+  label: string | null
+  note: string | null
+  url: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type JurisprudenciaRefWithSource = JurisprudenciaRef & {
+  jurisprudencia: Jurisprudencia | null
+}
+
 export type LawCollection = {
   id: number
   slug: string

@@ -18,34 +18,35 @@ Tres tiers: **anónimo** (lectura + búsqueda, ventana de reformas 7 días),
 
 ---
 
-## Estado (2026-08-31)
+## Estado (2026-09-01)
 
-- `npx tsc --noEmit`, `npm run lint`, `npm run test` (157), `npm run build`:
-  verdes. `npm run test:e2e`: 8/8 anónimos (3 autenticados en skip).
-  `supabase/tests/database/rls.test.sql` tiene 21 asserts (6 nuevos de cobros)
-  pero **no se pudieron correr**: esta máquina no tiene Docker.
-  `npm run test:rls` (pgTAP): 15/15 con Docker corriendo.
-- Plan de remediación arquitectónica **Phases 0-7 completo** — seguridad
-  cerrada a nivel RLS, capa de servicios, API v1, anclaje de anotaciones v2,
-  CI, convención de módulos. Resumen por fase en `docs/ROADMAP.md`.
-- Prod (`enrykddxhqsibbokrood`): migraciones hasta `0019` y la `0021`
-  (cobros) aplicadas; `0020` espera la recarga de contenido. 16 leyes,
-  6,330 artículos, 4 usuarios.
-- **Siguiente paso: Phase 12 — deploy de prueba a Vercel**, con la app tal
-  como está. Runbook: `docs/DEPLOY.md`.
+- `npx tsc --noEmit`, `npm run lint`, `npm run test` (182), `npm run build`:
+  verdes. `npm run test:e2e`: **no corrido** esta sesión — el puerto 3000
+  estaba ocupado por otra app y el `webServer` de Playwright no arranca en
+  otro. `supabase/tests/database/rls.test.sql` sigue sin correrse: esta
+  máquina no tiene Docker.
+- Plan de remediación arquitectónica **Phases 0-7 completo**. Resumen por fase
+  en `docs/ROADMAP.md`.
+- Prod (`enrykddxhqsibbokrood`): migraciones hasta `0019`, `0021` y **`0022`
+  (jurisprudencia)** aplicadas; `0020` espera la recarga de contenido.
+  16 leyes, 6,330 artículos, **23,882 resoluciones de la CC**, 4 usuarios.
+  La base pasó de 29 MB a **80 MB** (la jurisprudencia pesa 51 MB: más que
+  todo el corpus de leyes junto).
+- **Siguiente paso: Phase 12 — deploy de prueba a Vercel**. Runbook:
+  `docs/DEPLOY.md`.
 
 Pendientes conocidos (no bloquean la prueba, sí el lanzamiento público):
 
-1. **Calidad de contenido** — `validate_law()` falla en 12 de 16 leyes
-   (huecos de párrafos, numeración `Bis` colapsada, posiciones de sección
-   duplicadas). Los bugs ya están corregidos en `lex-extractor`; falta un
-   camino de **recarga por ley** para que el dato viejo se reemplace. Detalle
-   en `docs/ROADMAP.md` §Datos.
-2. **Cuenta free de prueba** (Beto) para habilitar los 2 e2e autenticados
-   (`PLAYWRIGHT_FREE_USER_EMAIL` / `_PASSWORD`).
-3. **No hay `app/auth/callback/route.ts`** — con "Confirm email" activado en
-   Supabase, el enlace del correo no puede canjear su `?code=` por sesión.
-   Para la prueba, dejar la confirmación apagada.
+1. **Calidad de contenido** — `validate_law()` falla en 12 de 16 leyes. Los
+   bugs ya están corregidos en `lex-extractor`; falta un camino de **recarga
+   por ley**. Detalle en `docs/ROADMAP.md` §Datos.
+2. **Cuenta free de prueba** (Beto) para habilitar los e2e autenticados
+   (`PLAYWRIGHT_FREE_USER_EMAIL` / `_PASSWORD`). Sigue siendo lo único que
+   impide verificar con un usuario real el panel de anotación, las notas de
+   caso y ahora el guardado de jurisprudencia.
+3. **Jurisprudencia**: falta la gaceta 124 (su PDF trae un espacio entre cada
+   letra) y todo lo posterior a junio 2025 — la gaceta va meses atrás del
+   portal. Detalle en `docs/JURISPRUDENCIA.md`.
 
 ---
 
@@ -147,7 +148,22 @@ Matriz completa en `docs/SECURITY.md`.
     paggo) están vacíos y `checkoutEnabled()` es falso, así que la app ofrece
     activación manual. El tier lo otorga SIEMPRE el webhook, nunca el regreso
     del usuario. Detalle en `docs/BILLING.md`.
-18. **Las herramientas (`/herramientas/*`) son páginas cliente puras** — sin
+18. **La jurisprudencia se indexa, no se copia ni se proxea** — el índice sale
+    de la **Gaceta Jurisprudencial** de la CC (PDF trimestral, `gaceta.py` en
+    lex-extractor), no del portal de consulta: ese portal es ASP.NET WebForms
+    tras un challenge administrado de Cloudflare que bloquea el POST de
+    búsqueda y escala a 403 en pocos minutos — medido, no supuesto. LexGT
+    guarda ficha + sumario oficial y **enlaza** el texto íntegro al portal
+    (`lib/cc-portal.ts`), que es exactamente lo que declara el `robots.txt`
+    de cc.gob.gt: `search=yes, use=reference, ai-train=no`. La tabla
+    `jurisprudencia` es de solo lectura para la app (sin políticas de
+    escritura) y **Pro-only en RLS**.
+19. **El buscador busca leyes Y artículos, en dos consultas distintas** — el
+    nombre de una ley no está en ningún `search_vector` (`articles` indexa
+    número y epígrafe; `paragraphs`, el texto), así que `searchLaws` filtra
+    `laws` en memoria sin acentos ni orden de palabras. Son decenas de filas:
+    más barato que un índice nuevo y no depende de `unaccent`.
+20. **Las herramientas (`/herramientas/*`) son páginas cliente puras** — sin
     DB, sin tier, sin API: el cálculo vive en `lib/modules/herramientas/*`
     (módulos sin `server-only`, con tests de Vitest) y la página solo lo
     dibuja. Alta en `lib/tools.ts`, que alimenta el menú y el índice.
@@ -208,6 +224,14 @@ app/
                                     ABIERTO por defecto (se cierra con la X)
       NotifBanner.tsx, types.ts
     [slug]/[section_id]/page.tsx → redirect a #seccion-… (enlaces viejos)
+  jurisprudencia/               → índice de sentencias de la CC (Pro)
+    page.tsx                    → buscador: texto libre, expediente, lapso,
+                                   tipo de proceso y resultado
+    ResultsClient.tsx           → tarjeta por resolución + guardar/adjuntar
+    guardadas/{page.tsx,SavedClient.tsx} → "Mis referencias", notas en línea
+    actions.ts                  → saveJurisprudenciaRef, updateJurisprudenciaRef,
+                                   deleteJurisprudenciaRef, addRefToCase,
+                                   removeRefFromCase
   casos/
     page.tsx, CasesClient.tsx
     [id]/page.tsx + CaseDetailClient.tsx → notas del caso (caja de texto
@@ -262,6 +286,10 @@ lib/
                          providers/{visanet,vanapay,paggo}.ts (vacíos),
                          fel.ts (Infile, vacío)
   anchors.ts          → articleAnchor / sectionAnchor (ids del documento)
+  cc-portal.ts        → enlaces al portal de la CC (no server-only: lo usan
+                         componentes cliente). No hay permalink por
+                         resolución — WebForms — así que se enlaza la
+                         búsqueda por expediente.
   cache/law-content.ts → contenido de ley cacheado (unstable_cache + tags)
   authz.ts            → Actor, getActor, requireUser/requirePro/requireAdmin
   action-result.ts    → ActionResult, runAction, ActionError (incl. RATE_LIMITED)
@@ -271,9 +299,9 @@ lib/
   api/handler.ts      → apiHandler (auth → rate limit → zod → servicio → JSON)
   api/rate-limit.ts   → searchLimiter / apiLimiter (Upstash, fail-open)
   services/           → annotations.ts, cases.ts, reforms.ts, admin.ts,
-                         billing.ts (+tests)
-  services/queries/   → laws.ts, reading.ts, search.ts, cases.ts, billing.ts
-                         (+tests)
+                         billing.ts, jurisprudencia.ts (+tests)
+  services/queries/   → laws.ts, reading.ts, search.ts (artículos Y leyes),
+                         cases.ts, billing.ts, jurisprudencia.ts (+tests)
   tools.ts            → catálogo de herramientas (menú + índice)
   revision.ts         → `GAZETTE_REVIEWED_ON`: fecha de la última revisión del
                          Diario de Centro América. **Se actualiza a mano cada
@@ -288,8 +316,9 @@ lib/
 middleware.ts         → refresca la cookie de sesión; protege /admin/*
 
 supabase/
-  migrations/0001…0021_*.sql    → 0001-0019 y 0021 aplicadas a prod;
-                                  0020 pendiente (datos legacy)
+  migrations/0001…0022_*.sql    → 0001-0019 y 0021 aplicadas a prod;
+                                  0020 (datos legacy) y 0022 (jurisprudencia)
+                                  pendientes
   seed.sql, seeds/{codigo_trabajo,test_reform}.sql
   tests/database/rls.test.sql   → pgTAP, 15 asserts (E1/E2/E3 + aislamiento)
   SCHEMA_SNAPSHOT.md            → schema vigente de prod
@@ -309,7 +338,9 @@ colecciones · `0009` reconciliación de schema · `0010` admin en
 reconciliación del schema del extractor · `0020` posición única de secciones
 hermanas (pendiente) · `0021` cobros: `plans`, `payments`, `invoices`,
 `tier_events`, `apply_tier()`, `record_payment()`, `admin_list_users()`
-(**aplicada a prod el 2026-09-01**).
+(**aplicada a prod el 2026-09-01**) · `0022` jurisprudencia:
+`jurisprudencia` (Pro-only en RLS, sin políticas de escritura),
+`jurisprudencia_refs`, `case_jurisprudencia` (**pendiente**).
 
 ---
 
@@ -325,11 +356,48 @@ hermanas (pendiente) · `0021` cobros: `plans`, `payments`, `invoices`,
 | `docs/MODULES.md` | Convención de módulos Pro |
 | `docs/BILLING.md` | Cobros, tiers, FEL y el panel del operador |
 | `docs/CONTENT.md` | Checklist de 121 leyes + estado de calidad de datos |
+| `docs/JURISPRUDENCIA.md` | Índice de sentencias de la CC: fuente, formato, operación |
 | `supabase/SCHEMA_SNAPSHOT.md` | Schema de producción |
 
 ---
 
-## Última sesión (2026-09-01)
+## Última sesión (2026-09-01, parte 2)
+
+**Jurisprudencia constitucional, y un buscador que no buscaba leyes.**
+
+- **La fuente se eligió midiendo, no suponiendo.** El portal de consulta de la
+  CC quedó descartado: WebForms con `__VIEWSTATE`, gate de reCAPTCHA y un
+  managed challenge de Cloudflare que devuelve 403 en el POST de búsqueda;
+  Chromium headless se queda en el interstitial y la IP escala a 403 a los ~15
+  requests. La Gaceta Jurisprudencial en PDF, en cambio, sale del WordPress de
+  cc.gob.gt sin challenge y con capa de texto. Todo el razonamiento en
+  `docs/JURISPRUDENCIA.md`.
+- **`gaceta.py` + `gaceta_uploader.py` + `main.py gaceta`** en lex-extractor:
+  38 gacetas descargadas, **23,985 resoluciones parseadas de 37** (la 124 se
+  rechaza a propósito). Tres generaciones de layout, cuatro grafías de fecha
+  y el veredicto a veces arriba y a veces abajo del expediente. 30 tests.
+- **Migración `0022` aplicada a prod** + carga: 23,882 filas (las 103 de
+  diferencia son reimpresiones que el upsert por UUID5 colapsa, como debe).
+  `jurisprudencia` es Pro-only en RLS y **no tiene políticas de escritura**.
+- **Un bug de RLS que solo apareció probando con la anon key**: escrita como
+  `using (public.is_pro())` la política se evalúa por fila y un SELECT anónimo
+  moría por statement timeout. Con `using ((select public.is_pro()))` es un
+  InitPlan. Verificado: anónimo `[]` en 0.87 s, Pro 23,882 filas en 0.38 s,
+  free 0 filas, insert y RPC denegados.
+- **`/jurisprudencia`** (buscador con los cuatro modos del portal, paginado) y
+  **`/jurisprudencia/guardadas`** (referencias con nota editable y "añadir a un
+  caso"). La entrada "Próximamente" de la barra lateral ya es un enlace real.
+- **Buscador arreglado** — buscar "ley organica del instituto" no devolvía la
+  ley, solo artículos sueltos: el nombre de una ley no vive en ningún
+  `search_vector`. `searchLaws` lo resuelve filtrando `laws` en memoria, sin
+  acentos y sin orden de palabras. Verificado contra la base real, en
+  `/buscar` y en el ⌘K.
+- **Sin verificar:** los e2e (puerto 3000 ocupado) y el guardado real de una
+  referencia contra la base, que sigue esperando la cuenta de prueba.
+
+---
+
+## Sesión previa (2026-09-01, parte 1)
 
 **Cobros, tiers, Google auth y el panel del operador.**
 

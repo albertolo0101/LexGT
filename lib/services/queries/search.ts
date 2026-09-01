@@ -35,6 +35,90 @@ type ParagraphRow = {
   }
 }
 
+export type LawResult = {
+  law_id: string
+  slug: string
+  short_name: string
+  full_name: string
+  decree: string | null
+}
+
+// Sin acentos y en minúsculas: nadie escribe "Ley Orgánica" con tilde en un
+// buscador, y `to_tsvector('spanish')` tampoco resuelve esto porque el nombre
+// de la ley no vive en ningún search_vector.
+const COMBINING_MARKS = /[̀-ͯ]/g
+
+function fold(text: string): string {
+  return text.normalize('NFD').replace(COMBINING_MARKS, '').toLowerCase()
+}
+
+// Palabras que aparecen en casi todos los nombres de ley y no discriminan.
+const STOPWORDS = new Set(['de', 'del', 'la', 'el', 'los', 'las', 'y', 'e', 'en', 'para', 'a'])
+
+/**
+ * Busca LEYES por su nombre.
+ *
+ * Va aparte de `searchArticles` porque el nombre de una ley no está en ningún
+ * `search_vector`: `articles.search_vector` solo indexa número y epígrafe, y
+ * `paragraphs.search_vector` el texto. Por eso "ley orgánica del instituto…"
+ * devolvía artículos sueltos y nunca la ley.
+ *
+ * El filtrado es en memoria a propósito: `laws` son decenas de filas (121 en
+ * el catálogo objetivo), traerlas es más barato que un índice nuevo, y así el
+ * cotejo puede ignorar acentos y orden de palabras sin depender de la
+ * extensión `unaccent`.
+ */
+export async function searchLaws(
+  db: SupabaseClient,
+  q: string,
+  limit = 5
+): Promise<LawResult[]> {
+  const tokens = fold(q).split(/\s+/).filter((t) => t.length > 1 && !STOPWORDS.has(t))
+  if (tokens.length === 0) return []
+
+  const { data, error } = await db
+    .from('laws')
+    .select('id, slug, short_name, full_name, decree')
+    .eq('is_active', true)
+  if (error) throw error
+
+  type Row = { id: string; slug: string; short_name: string; full_name: string; decree: string | null }
+
+  const scored = ((data ?? []) as Row[])
+    .map((law) => {
+      const short = fold(law.short_name)
+      const full = fold(law.full_name ?? '')
+      const decree = fold(law.decree ?? '')
+      const haystack = `${short} ${full} ${decree}`
+
+      // Todos los términos deben aparecer; si no, no es esta ley.
+      if (!tokens.every((t) => haystack.includes(t))) return null
+
+      // El nombre corto pesa más que el largo, y el decreto exacto más que
+      // ambos: quien escribe "114-97" quiere el Código Civil, no una mención.
+      let score = 0
+      for (const token of tokens) {
+        if (decree && decree.includes(token)) score += 6
+        if (short.includes(token)) score += 3
+        if (full.includes(token)) score += 1
+      }
+      if (short.startsWith(tokens[0]) || full.startsWith(tokens[0])) score += 2
+
+      return { law, score }
+    })
+    .filter((x): x is { law: Row; score: number } => x !== null)
+    .sort((a, b) => b.score - a.score || a.law.short_name.localeCompare(b.law.short_name, 'es'))
+    .slice(0, limit)
+
+  return scored.map(({ law }) => ({
+    law_id: law.id,
+    slug: law.slug,
+    short_name: law.short_name,
+    full_name: law.full_name,
+    decree: law.decree,
+  }))
+}
+
 export type SearchArticlesInput = {
   q: string
   lawSlug: string | null

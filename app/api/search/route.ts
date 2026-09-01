@@ -1,5 +1,5 @@
 import { createServerSupabaseClient } from '@/lib/supabase-server'
-import { searchArticles } from '@/lib/services/queries/search'
+import { searchArticles, searchLaws } from '@/lib/services/queries/search'
 import { searchLimiter, checkRateLimit } from '@/lib/api/rate-limit'
 import { NextRequest } from 'next/server'
 
@@ -27,7 +27,11 @@ export async function GET(req: NextRequest) {
   }
 
   const supabase = await createServerSupabaseClient()
-  const { results, total } = await searchArticles(supabase, { q, lawSlug: law, limit })
+  // Las leyes solo se buscan cuando no se está buscando *dentro* de una ley.
+  const [{ results, total }, laws] = await Promise.all([
+    searchArticles(supabase, { q, lawSlug: law, limit }),
+    law ? Promise.resolve([]) : searchLaws(supabase, q),
+  ])
 
-  return Response.json({ results, total, query: q })
+  return Response.json({ laws, results, total, query: q })
 }
