@@ -24,7 +24,7 @@ export async function saveAnnotation(
   db: SupabaseClient,
   actor: Actor,
   input: SaveAnnotationInput
-): Promise<void> {
+): Promise<{ id: string }> {
   requireUser(actor);
 
   const color = input.color ?? "yellow";
@@ -45,21 +45,27 @@ export async function saveAnnotation(
 
   const checksum = await textChecksum((paragraph as { text: string }).text);
 
-  const { error } = await db.from("annotations").insert({
-    user_id: actor.userId,
-    paragraph_id: input.paragraph_id,
-    article_id: input.article_id,
-    char_start: input.char_start,
-    char_end: input.char_end,
-    color,
-    note: input.note ?? null,
-    quote: input.quote,
-    prefix: input.prefix ?? null,
-    suffix: input.suffix ?? null,
-    text_checksum: checksum,
-    anchor_status: "anchored",
-  });
+  const { data: created, error } = await db
+    .from("annotations")
+    .insert({
+      user_id: actor.userId,
+      paragraph_id: input.paragraph_id,
+      article_id: input.article_id,
+      char_start: input.char_start,
+      char_end: input.char_end,
+      color,
+      note: input.note ?? null,
+      quote: input.quote,
+      prefix: input.prefix ?? null,
+      suffix: input.suffix ?? null,
+      text_checksum: checksum,
+      anchor_status: "anchored",
+    })
+    // El cliente pinta el <mark> con este id sin re-renderizar la ley entera.
+    .select("id")
+    .single();
   if (error) throw error;
+  return { id: (created as { id: string }).id };
 }
 
 export const ReanchorAnnotationInput = z.object({

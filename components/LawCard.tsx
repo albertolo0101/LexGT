@@ -28,33 +28,56 @@ function AlertBadge({ count }: { count: number }) {
   )
 }
 
+// Vista "cuadrícula": cada ley se ve como un tomo empastado — lomo a la
+// izquierda, filete dorado y tipografía serif en oro sobre azul.
 function GridContent({ law, articleCount, badge }: { law: Law; articleCount: number; badge?: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-rule bg-white p-4 h-full flex flex-col gap-2 hover:border-gold-400 transition-colors">
-      <div className="flex items-start justify-between gap-2">
-        {law.decree ? (
-          <span className="text-xs font-mono text-ink-400">{law.decree}</span>
-        ) : (
-          <span />
-        )}
-        {badge}
+    <div className="group relative flex h-full min-h-[212px] overflow-hidden rounded-l-[3px] rounded-r-md bg-navy-900 shadow-[0_1px_2px_rgba(10,30,58,.25),0_10px_18px_-14px_rgba(10,30,58,.9)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_2px_4px_rgba(10,30,58,.3),0_16px_26px_-16px_rgba(10,30,58,.95)]">
+      {/* lomo */}
+      <span
+        aria-hidden
+        className="w-4 flex-shrink-0 bg-gradient-to-r from-navy-800 via-navy-900 to-navy-800 border-r border-gold-500/30"
+      />
+      <span aria-hidden className="w-px flex-shrink-0 bg-gold-500/20" />
+
+      {/* pasta */}
+      <div className="flex min-w-0 flex-1 flex-col gap-2 border border-gold-500/25 m-2 ml-1.5 px-4 py-4 transition-colors group-hover:border-gold-400/50">
+        <div className="flex items-start justify-between gap-2">
+          {law.decree ? (
+            <span className="font-mono text-[10px] uppercase tracking-widest text-gold-400/80">{law.decree}</span>
+          ) : (
+            <span />
+          )}
+          {badge}
+        </div>
+
+        <p className="font-serif text-lg leading-snug text-gold-200">{law.short_name}</p>
+
+        <span aria-hidden className="h-px w-10 bg-gold-500/40" />
+
+        <p className="line-clamp-3 text-xs leading-snug text-navy-100/60">{law.full_name}</p>
+
+        <p className="mt-auto pt-2 text-[11px] uppercase tracking-widest text-navy-100/40">
+          {articleCount} artículos
+        </p>
       </div>
-      <p className="font-serif text-base text-ink-900 leading-snug">{law.short_name}</p>
-      <p className="text-xs text-ink-500 leading-snug line-clamp-2">{law.full_name}</p>
-      <p className="text-xs text-ink-400 mt-auto pt-2">{articleCount} artículos</p>
     </div>
   )
 }
 
+// Vista "biblioteca": nombre de la ley primero, decreto a continuación en tono
+// más pálido.
 function ListContent({ law, articleCount, badge }: { law: Law; articleCount: number; badge?: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-4 py-4 px-1 hover:bg-paper-2 transition-colors">
       <div className="min-w-0">
-        <p className="font-serif text-base text-ink-900 leading-snug">{law.short_name}</p>
+        <p className="truncate leading-snug">
+          <span className="font-serif text-base text-ink-900">{law.short_name}</span>
+          {law.decree && <span className="ml-2 font-mono text-xs text-ink-400/80">{law.decree}</span>}
+        </p>
         <p className="text-xs text-ink-500 mt-0.5 leading-snug truncate">{law.full_name}</p>
       </div>
       <div className="shrink-0 flex items-center gap-3">
-        {law.decree && <span className="text-xs font-mono text-ink-400 hidden sm:inline">{law.decree}</span>}
         <span className="text-xs text-ink-400 hidden sm:inline">{articleCount} arts.</span>
         {badge}
       </div>

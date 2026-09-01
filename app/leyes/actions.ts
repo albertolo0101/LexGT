@@ -1,6 +1,8 @@
 "use server"
 
+import { revalidateTag } from "next/cache";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { LAW_CONTENT_TAG } from "@/lib/cache/law-content";
 import { getActor } from "@/lib/authz";
 import { runAction, type ActionResult } from "@/lib/action-result";
 import * as annotationsService from "@/lib/services/annotations";
@@ -16,12 +18,12 @@ export async function saveAnnotation(data: {
   suffix?: string | null;
   color?: string;
   note?: string | null;
-}): Promise<ActionResult<void>> {
+}): Promise<ActionResult<{ id: string }>> {
   return runAction(async () => {
     const supabase = await createServerSupabaseClient();
     const actor = await getActor(supabase);
     const input = annotationsService.SaveAnnotationInput.parse(data);
-    await annotationsService.saveAnnotation(supabase, actor, input);
+    return annotationsService.saveAnnotation(supabase, actor, input);
   });
 }
 
@@ -93,5 +95,6 @@ export async function publishReform(data: {
     const actor = await getActor(supabase);
     const input = reformsService.PublishReformInput.parse(data);
     await reformsService.publishReform(supabase, actor, input);
+    revalidateTag(LAW_CONTENT_TAG);
   });
 }

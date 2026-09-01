@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Ico } from './icons'
 import type { EffectiveTier } from './ShellClient'
+import { articleAnchor } from '@/lib/anchors'
 
 type SearchResult = {
   article_id: string
@@ -60,7 +61,7 @@ export default function SearchOverlay({
 
   function goToResult(r: SearchResult) {
     onClose()
-    router.push(`/leyes/${r.law_slug}/${r.section_id}#articulo-${r.article_number}`)
+    router.push(`/leyes/${r.law_slug}#${articleAnchor(r.article_number)}`)
   }
 
   function handleSubmit(e: React.FormEvent) {

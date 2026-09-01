@@ -1,9 +1,15 @@
 import { createServerSupabaseClient } from "@/lib/supabase-server";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import type { SectionNode } from "@/lib/types";
-import { getLawMeta, getLawToc } from "@/lib/services/queries/reading";
+import { getActor } from "@/lib/authz";
+import { getLawMeta, getLawUserLayer } from "@/lib/services/queries/reading";
+import { getCachedLawContent } from "@/lib/cache/law-content";
+import ReaderSurface from "@/components/ReaderSurface";
+import ArticleBlock from "./ArticleBlock";
+import DocHeader from "./DocHeader";
+import LawToc from "./LawToc";
+import NotifBanner from "./NotifBanner";
+import RightPanel from "./RightPanel";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -14,155 +20,84 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return { title: meta ? `${meta.shortName} — LexGT` : "LexGT" };
 }
 
-const KIND_LABEL: Record<string, string> = {
-  libro: "Libro",
-  titulo: "Título",
-  capitulo: "Capítulo",
-  seccion: "Sección",
-  parte: "Parte",
-};
-
-function renderTree(
-  nodes: SectionNode[],
-  slug: string,
-  depth = 0
-): React.ReactNode {
-  if (nodes.length === 0) return null;
-
-  return (
-    <ul className={depth === 0 ? "space-y-1" : "mt-1 space-y-0.5"}>
-      {nodes
-        .sort((a, b) => a.position - b.position)
-        .map((node) => {
-          const label = KIND_LABEL[node.kind] ?? node.kind;
-          const fullLabel = node.number ? `${label} ${node.number}` : label;
-          const isLeaf = node.children.length === 0;
-
-          if (isLeaf) {
-            return (
-              <li key={node.id}>
-                <Link
-                  href={`/leyes/${slug}/${node.id}`}
-                  style={{ paddingLeft: `${0.75 + depth * 1.25}rem` }}
-                  className="flex items-baseline gap-3 py-1.5 pr-3 rounded hover:bg-blue-50 group transition-colors"
-                >
-                  <span className="shrink-0 text-xs text-gray-400 font-medium w-24">
-                    {fullLabel}
-                  </span>
-                  <span className="text-sm text-gray-800 group-hover:text-blue-700 transition-colors leading-snug">
-                    {node.heading}
-                  </span>
-                </Link>
-              </li>
-            );
-          }
-
-          const isBook = node.kind === "libro";
-
-          return (
-            <li
-              key={node.id}
-              className={depth === 0 ? "mt-8 first:mt-0" : "mt-4"}
-            >
-              <div
-                style={{ paddingLeft: `${0.75 + depth * 1.25}rem` }}
-                className={
-                  isBook
-                    ? "pb-2 mb-2 border-b border-gray-200"
-                    : "pb-1"
-                }
-              >
-                <p
-                  className={
-                    isBook
-                      ? "text-xs font-bold uppercase tracking-widest text-gray-400"
-                      : "text-xs font-semibold uppercase tracking-wider text-gray-400"
-                  }
-                >
-                  {fullLabel}
-                </p>
-                <p
-                  className={
-                    isBook
-                      ? "text-base font-semibold text-gray-900 mt-0.5"
-                      : "text-sm font-medium text-gray-700 mt-0.5"
-                  }
-                >
-                  {node.heading}
-                </p>
-              </div>
-              {renderTree(node.children, slug, depth + 1)}
-            </li>
-          );
-        })}
-    </ul>
-  );
-}
-
-export default async function LawTocPage({ params }: Props) {
+// La ley completa en una sola página: el lector hace scroll continuo por todos
+// los capítulos y el índice de la izquierda marca dónde va. Los saltos internos
+// son anclas (#seccion-… / #articulo-…), no navegaciones.
+export default async function LawReadingPage({ params }: Props) {
   const { slug } = await params;
   const supabase = await createServerSupabaseClient();
+  const actor = await getActor(supabase);
 
-  const toc = await getLawToc(supabase, slug);
-  if (!toc) notFound();
+  // Contenido público cacheado + capa del usuario siempre fresca.
+  const content = await getCachedLawContent(slug);
+  if (!content) notFound();
 
-  const { law, tree, directArticles } = toc;
-  const hasSections = tree.length > 0;
+  const { law, nodes, toc, articleCount } = content;
+  const {
+    annotationsByParagraph,
+    notes,
+    orphanedAnnotations,
+    reforms,
+    hasUnseenReform,
+    isAuthenticated,
+  } = await getLawUserLayer(supabase, actor, content);
+
+  const notesById = Object.fromEntries(notes.map((n) => [n.id, n.note]));
 
   return (
-    <div className="min-h-screen bg-white">
-      <header className="border-b border-gray-100">
-        <div className="max-w-3xl mx-auto px-6 py-4">
-          <Link
-            href="/leyes"
-            className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+    <div className="min-h-full bg-paper-2">
+      <div className="mx-auto flex w-full max-w-[1760px] gap-5 px-3 py-6 lg:gap-7 lg:px-5">
+        <LawToc
+          entries={toc}
+          lawShortName={law.short_name}
+          decree={law.decree}
+          articleCount={articleCount}
+        />
+
+        <div className="flex min-w-0 flex-1 justify-center">
+          <ReaderSurface
+            isAuthenticated={isAuthenticated}
+            tier={actor.tier}
+            notesById={notesById}
+            className="doc-sheet"
           >
-            ← Leyes
-          </Link>
-        </div>
-      </header>
+            <NotifBanner lawSlug={slug} show={actor.tier === "pro" && hasUnseenReform} />
 
-      <main className="max-w-3xl mx-auto px-6 py-10">
-        <div className="mb-10">
-          {law.decree && (
-            <p className="text-xs font-mono text-gray-400 mb-1">{law.decree}</p>
-          )}
-          <h1 className="text-2xl font-semibold text-gray-900 leading-tight">
-            {law.short_name}
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">{law.full_name}</p>
+            <DocHeader law={law} latestReform={reforms[0] ?? null} articleCount={articleCount} />
+
+            {nodes.length === 0 ? (
+              <p className="text-sm text-ink-400">Esta ley todavía no tiene contenido cargado.</p>
+            ) : (
+              nodes.map((node) =>
+                node.kind === "section" ? (
+                  <section
+                    key={node.id}
+                    id={node.anchor}
+                    data-section-id={node.id}
+                    className={`doc-section doc-section-d${Math.min(node.depth, 2)}`}
+                  >
+                    {node.label && <p className="doc-section-label">{node.label}</p>}
+                    <h2 className="doc-section-heading">{node.heading}</h2>
+                  </section>
+                ) : (
+                  <ArticleBlock
+                    key={node.article.id}
+                    article={node.article}
+                    annotationsByParagraph={annotationsByParagraph}
+                  />
+                )
+              )
+            )}
+          </ReaderSurface>
         </div>
 
-        <div className="border-t border-gray-100 pt-6">
-          <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-5">
-            Índice
-          </h2>
-
-          {hasSections ? (
-            renderTree(tree, slug)
-          ) : directArticles.length > 0 ? (
-            <ul className="divide-y divide-gray-100">
-              {directArticles.map((article) => (
-                <li
-                  key={article.id}
-                  className="flex items-baseline gap-3 py-2 px-2"
-                >
-                  <span className="text-xs text-gray-400 font-medium shrink-0 w-20">
-                    Art. {article.number}
-                  </span>
-                  <span className="text-sm text-gray-700">
-                    {article.heading ?? ""}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-sm text-gray-400">
-              Esta ley no tiene contenido disponible.
-            </p>
-          )}
-        </div>
-      </main>
+        <RightPanel
+          tier={actor.tier}
+          notes={notes}
+          orphanedAnnotations={orphanedAnnotations}
+          reforms={reforms}
+        />
+      </div>
     </div>
   );
 }

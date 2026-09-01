@@ -35,6 +35,19 @@ Los cuatro deben pasar; CI corre exactamente eso. Confirmar también que
    | `UPSTASH_REDIS_REST_URL` | opcional | sin esto el rate limiting queda desactivado |
    | `UPSTASH_REDIS_REST_TOKEN` | opcional | idem |
 
+   **Type: `Config`, no `Secret`, para las dos `NEXT_PUBLIC_*`.** El prefijo
+   `NEXT_PUBLIC_` las inyecta en el bundle del navegador — son públicas por
+   definición, y Vercel avisa en rojo si las marcas como Secret. Un secret
+   guardado **no se puede convertir a Config**: hay que borrar la variable y
+   crearla de nuevo. Si más adelante agregas Upstash, `UPSTASH_REDIS_REST_TOKEN`
+   sí va como `Secret` (no lleva prefijo público).
+
+   El nombre debe coincidir carácter por carácter con el del código
+   (`lib/supabase.ts`, `middleware.ts`): un typo compila igual y revienta en
+   runtime con 500 en todas las rutas. El valor de la URL va sin barra final.
+   Tras cambiar cualquier variable hay que **redesplegar** — las
+   `NEXT_PUBLIC_*` se hornean durante el build.
+
    **Nunca** agregar la `service_role` key: la app no la usa y en Vercel
    quedaría a un `process.env` de distancia de un bug de RSC.
 5. Deploy. Todas las rutas son dinámicas (`ƒ`, server-rendered on demand),
@@ -69,10 +82,11 @@ sesión. Consecuencia:
 En el dominio de Vercel, en este orden:
 
 1. `/` redirige a `/leyes` y el catálogo lista las 16 leyes.
-2. Abrir una ley → tabla de contenidos → un capítulo: se ven artículos y
-   párrafos.
-3. `⌘K` / `Ctrl+K` → buscar "propiedad" → un resultado navega al artículo
-   correcto (`#articulo-N`).
+2. Abrir una ley: se ve el documento completo en scroll continuo, con el
+   índice a la izquierda marcando el capítulo actual; hacer clic en un
+   capítulo del índice salta a ese punto.
+3. `⌘K` / `Ctrl+K` → buscar "propiedad" → un resultado salta al artículo
+   correcto dentro de la ley (`#articulo-N`).
 4. Registrarse con un correo real → sesión activa (ver §3).
 5. Seleccionar texto → guardar highlight amarillo → recargar: persiste.
 6. Como free: intentar nota o color → se abre el paywall, no una pantalla de

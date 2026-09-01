@@ -46,10 +46,10 @@ describe("saveAnnotation", () => {
   });
 
   it("allows yellow highlights for free users", async () => {
-    const insertBuilder = makeBuilder({ data: null, error: null });
+    const insertBuilder = makeBuilder({ data: { id: "ann1" }, error: null });
     const db = makeDb([paragraphBuilder(), insertBuilder]);
 
-    await saveAnnotation(db, freeActor, {
+    const created = await saveAnnotation(db, freeActor, {
       paragraph_id: "p1",
       article_id: "a1",
       char_start: 0,
@@ -57,6 +57,8 @@ describe("saveAnnotation", () => {
       quote: "hola ",
     });
 
+    // El id vuelve al cliente para pintar el <mark> sin recargar la ley.
+    expect(created).toEqual({ id: "ann1" });
     expect(insertBuilder.insert).toHaveBeenCalledWith(
       expect.objectContaining({ user_id: "free-user", color: "yellow", quote: "hola ", anchor_status: "anchored" })
     );
@@ -77,7 +79,7 @@ describe("saveAnnotation", () => {
   });
 
   it("allows non-yellow colors for pro users", async () => {
-    const insertBuilder = makeBuilder({ data: null, error: null });
+    const insertBuilder = makeBuilder({ data: { id: "ann2" }, error: null });
     const db = makeDb([paragraphBuilder(), insertBuilder]);
 
     await saveAnnotation(db, proActor, {

@@ -20,7 +20,7 @@ Tres tiers: **anónimo** (lectura + búsqueda, ventana de reformas 7 días),
 
 ## Estado (2026-08-31)
 
-- `npx tsc --noEmit`, `npm run lint`, `npm run test` (67), `npm run build`:
+- `npx tsc --noEmit`, `npm run lint`, `npm run test` (70), `npm run build`:
   verdes. `npm run test:rls` (pgTAP): 15/15 con Docker corriendo.
 - Plan de remediación arquitectónica **Phases 0-7 completo** — seguridad
   cerrada a nivel RLS, capa de servicios, API v1, anclaje de anotaciones v2,
@@ -66,10 +66,12 @@ Matriz completa en `docs/SECURITY.md`.
 
 ## Decisiones clave
 
-1. **Tres factories de cliente Supabase, no mezclar** — `lib/supabase.ts`
+1. **Cuatro factories de cliente Supabase, no mezclar** — `lib/supabase.ts`
    (browser, Client Components), `lib/supabase-server.ts` (cookie-bound,
    Server Components/Actions; `next/headers` rompe Client Components),
-   `lib/supabase-bearer.ts` (Bearer token, solo `app/api/v1/*`).
+   `lib/supabase-bearer.ts` (Bearer token, solo `app/api/v1/*`),
+   `lib/supabase-public.ts` (sin sesión, solo contenido público cacheado —
+   `unstable_cache` no puede leer cookies).
 2. **`sections.kind` en español**: `libro/titulo/capitulo/seccion/parte/
    parrafo/subseccion/articulo/disposiciones`. La columna de texto es
    `heading`, no `title`.
@@ -79,7 +81,7 @@ Matriz completa en `docs/SECURITY.md`.
    `runAction` — nunca `throw new Error(pgError.message)`.
 5. **`approveReform` ≠ `publishReform`** — approveReform reutiliza el
    `reform_id` del borrador; publishReform crearía un duplicado.
-6. **Tooltips y modales dentro de `ParagraphHighlighter` van por portal**
+6. **Tooltips y modales dentro de `ReaderSurface` van por portal**
    (`createPortal(…, document.body)`) para no meter un `<div>` dentro de un
    `<p>` (error de hidratación).
 7. **Búsqueda**: `plainto_tsquery('spanish', q)` sobre `tsvector`; articles y
@@ -97,6 +99,23 @@ Matriz completa en `docs/SECURITY.md`.
     `aws-1-us-east-1.pooler.supabase.com:5432`.
 12. **Módulos Pro aislados** en `lib/modules/<name>/` — nada del core los
     importa (`docs/MODULES.md`).
+13. **Una ley = una página.** La vista de lectura renderiza la ley completa en
+    scroll continuo; el índice de la izquierda solo hace scroll y marca dónde
+    va el lector. Tres consecuencias que hay que respetar:
+    - **Paginar toda lectura a escala de ley**: PostgREST corta en 1,000 filas
+      y el Código Civil tiene 1,996 artículos y 2,894 párrafos. Sin
+      `.range(...)` en bucle la ley sale truncada **sin error**.
+    - **El orden de lectura sale de `articles.position`**, no de
+      `sections.position` (que tiene colisiones conocidas en 7 leyes). Los
+      encabezados de sección se emiten al cambiar de rama del árbol.
+    - **Un solo componente cliente por página** (`ReaderSurface`), con
+      delegación de eventos sobre párrafos renderizados en el servidor. Montar
+      un componente por párrafo era viable con un capítulo, no con una ley.
+14. **El contenido de ley se cachea, la capa de usuario no** —
+    `getLawContent` (público, idéntico para todos) va por
+    `lib/cache/law-content.ts`; `getLawUserLayer` (highlights, notas,
+    reformas) siempre se consulta fresco. Las acciones que cambian texto
+    llaman `revalidateTag(LAW_CONTENT_TAG)`.
 
 ---
 
@@ -136,14 +155,18 @@ app/
     v1/calc-laboral/route.ts     → POST indemnización Art. 82 (Pro)
   buscar/page.tsx                → resultados full-text
   leyes/
-    page.tsx + LeyesIndexClient.tsx → catálogo + badges de reformas
+    page.tsx + LeyesIndexClient.tsx → catálogo (cuadrícula de "libros" + lista)
     actions.ts                   → saveAnnotation, deleteAnnotation,
                                     updateAnnotationNote, migrateAnnotations,
                                     markReformSeen, publishReform
-    [slug]/page.tsx              → tabla de contenidos (árbol de secciones)
-    [slug]/[section_id]/         → vista de lectura
-      page.tsx, Article.tsx, ChapterRail.tsx, DocHeader.tsx,
-      SectionNav.tsx, RightPanel.tsx, NotifBanner.tsx, types.ts
+    [slug]/                      → vista de lectura: la ley COMPLETA en scroll
+      page.tsx                    → compone índice + hoja + panel derecho
+      LawToc.tsx                  → índice sticky con scroll-spy (cliente)
+      DocHeader.tsx               → portada del documento
+      ArticleBlock.tsx            → artículo (entrada corrida "Artículo N.")
+      ParagraphText.tsx           → párrafo anotable, 100% servidor
+      RightPanel.tsx, NotifBanner.tsx, types.ts
+    [slug]/[section_id]/page.tsx → redirect a #seccion-… (enlaces viejos)
   casos/
     page.tsx, CasesClient.tsx, [id]/page.tsx
     actions.ts                   → createCase, deleteCase,
@@ -163,11 +186,15 @@ components/
   SidebarContent.tsx  → Server: leyes, actualizaciones, link /casos
   SearchOverlay.tsx   → paleta ⌘K (debounce → /api/search)
   SearchBar.tsx       → form → /buscar?q=
-  ParagraphHighlighter.tsx → selección de texto, tooltip, highlights, casos
+  ReaderSurface.tsx   → UNA superficie cliente por ley: selección de texto,
+                         tooltip de highlight/nota, "guardar en caso"
   LawCard.tsx, ReformModal.tsx, PaywallModal.tsx, icons.tsx
 
 lib/
-  supabase.ts / supabase-server.ts / supabase-bearer.ts  → las tres factories
+  supabase.ts / supabase-server.ts / supabase-bearer.ts / supabase-public.ts
+                      → las cuatro factories (ver decisión 1)
+  anchors.ts          → articleAnchor / sectionAnchor (ids del documento)
+  cache/law-content.ts → contenido de ley cacheado (unstable_cache + tags)
   authz.ts            → Actor, getActor, requireUser/requirePro/requireAdmin
   action-result.ts    → ActionResult, runAction, ActionError (incl. RATE_LIMITED)
   anchoring.ts        → textChecksum (SHA-256), resolveAnchor, ANCHOR_CONTEXT_LENGTH
@@ -222,22 +249,46 @@ hermanas (pendiente).
 
 ## Última sesión (2026-08-31)
 
-Limpieza de repo y reescritura de documentación, previo al deploy de prueba:
+**Parte 1 — limpieza de repo y documentación** (commit `e68b8e2`): README real,
+CLAUDE.md reescrito contra el estado verificado, `docs/ROADMAP.md` y
+`docs/DEPLOY.md` nuevos, `LAWS.md` → `docs/CONTENT.md`, `SCHEMA_SNAPSHOT.md`
+regenerado desde prod. Borrados `ARCHITECTURE_REVIEW.md`,
+`LEXGT_EXECUTION_PLAN.md`, `.env.local.example` y los SVG de create-next-app.
 
-- Documentación reorganizada: `README.md` real (antes era el de
-  `create-next-app`), `CLAUDE.md` reescrito contra el estado verificado,
-  `docs/ROADMAP.md` nuevo (reemplaza `LEXGT_EXECUTION_PLAN.md` y
-  `ARCHITECTURE_REVIEW.md`, ambos borrados por obsoletos), `docs/DEPLOY.md`
-  nuevo, `LAWS.md` → `docs/CONTENT.md` actualizado, `SCHEMA_SNAPSHOT.md`
-  regenerado desde prod (post-`0019`).
-- Borrados: `ARCHITECTURE_REVIEW.md`, `LEXGT_EXECUTION_PLAN.md`,
-  `.env.local.example` (duplicado de `.env.example`), los cinco SVG por
-  defecto de `create-next-app` en `public/`, `supabase/snippets/` vacío.
-  `package.json` renombrado de `lexgt-scaffold` a `lexgt`.
-- Sincronizado con `origin/main`, que traía las migraciones `0019` y `0020`
-  de la sesión del extractor (2026-07-04) sin reflejar en la documentación.
-- Verificado contra prod vía Supabase MCP: migraciones aplicadas, schema
-  completo, conteos, advisors de seguridad y `validate_law()` por ley.
+**Parte 2 — vista de lectura: la ley completa en una página.**
 
-Siguiente sesión: ejecutar `docs/DEPLOY.md` (deploy a Vercel) y, después,
-la recarga por ley del contenido desde `lex-extractor`.
+- `app/leyes/[slug]/` es ahora el lector: documento continuo + índice sticky
+  con scroll-spy + panel derecho (colapsado por defecto). La antigua tabla de
+  contenidos y la ruta por sección desaparecieron;
+  `[slug]/[section_id]` solo redirige a `#seccion-…`.
+- `components/ReaderSurface.tsx` reemplaza a `ParagraphHighlighter`: una sola
+  superficie cliente con delegación de eventos; los párrafos los renderiza el
+  servidor (`ParagraphText`, `segments.ts`). Al guardar/borrar un highlight se
+  parcha el DOM (`saveAnnotation` ahora devuelve el `id`) en vez de
+  re-renderizar la ley; solo las notas fuerzan `router.refresh()`.
+- **Hallazgo crítico:** PostgREST corta en 1,000 filas — el Código Civil
+  (1,996 artículos) salía truncado sin error. Todas las lecturas a escala de
+  ley se paginan con `.range()`.
+- Orden de lectura por `articles.position` (no `sections.position`, que tiene
+  colisiones); los encabezados se emiten al cambiar de rama.
+- Contenido cacheado en `lib/cache/law-content.ts` (`unstable_cache`, tag +
+  versión de clave) con `lib/supabase-public.ts` como cuarta factory.
+  Medido en build de producción: Código Civil 2.3 s frío → 0.75 s cacheado
+  (1.3 MB gzip); Código de Trabajo 0.41 s.
+- **Rate limiting:** las credenciales de Upstash de `.env.local` apuntan a una
+  instancia inexistente y cada búsqueda pagaba ~4.6 s de reintentos antes de
+  hacer fail-open. `lib/api/rate-limit.ts` ahora usa 1 reintento y un techo de
+  400 ms → búsqueda de 4.75 s a ~0.2 s. **Antes de configurar Upstash en
+  Vercel, verificar que la instancia exista.**
+- Catálogo: las tarjetas de la cuadrícula ahora son "libros" (pasta azul,
+  tipografía dorada, lomo); en la lista y en la barra lateral va primero el
+  nombre de la ley y luego el decreto en tono pálido.
+- Verificado: `tsc`, `lint` limpio, 78 unit tests, `build`, 3/3 e2e anónimos
+  contra el build de producción, y que el texto de cada `[data-paragraph-id]`
+  en el DOM coincide byte a byte con `paragraphs.text` (contrato de anclaje).
+- **Sin verificar (requiere sesión):** guardar highlight, nota y "guardar en
+  caso" con un usuario real — los e2e autenticados siguen en `test.skip`
+  hasta que exista la cuenta free de prueba.
+
+Siguiente sesión: ejecutar `docs/DEPLOY.md` (deploy a Vercel) y, después, la
+recarga por ley del contenido desde `lex-extractor`.

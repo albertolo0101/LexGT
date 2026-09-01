@@ -5,7 +5,6 @@ export type NoteItem = {
   quote: string
   articleNumber: string
   articleHeading: string | null
-  sectionId: string | null
 }
 
 export type OrphanedAnnotation = {
@@ -15,13 +14,4 @@ export type OrphanedAnnotation = {
   quote: string
   articleNumber: string
   articleHeading: string | null
-  sectionId: string | null
-}
-
-export type SiblingSection = {
-  id: string
-  kind: string
-  number: string | null
-  heading: string
-  position: number
 }

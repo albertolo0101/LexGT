@@ -30,3 +30,14 @@ export const HL_COLORS: Record<HighlightColor, string> = {
   blue: 'var(--color-hl-blue)',
   pink: 'var(--color-hl-pink)',
 }
+
+// Clases del <mark> de un highlight. Las usan tanto el render de servidor
+// (ParagraphText) como el <mark> optimista que ReaderSurface inserta en el DOM
+// al guardar, así que deben existir literalmente aquí para que Tailwind las
+// incluya en el bundle.
+export const HL_MARK_CLASS: Record<HighlightColor, string> = {
+  yellow: 'bg-hl-yellow rounded-sm cursor-pointer',
+  green: 'bg-hl-green rounded-sm cursor-pointer',
+  blue: 'bg-hl-blue rounded-sm cursor-pointer',
+  pink: 'bg-hl-pink rounded-sm cursor-pointer',
+}

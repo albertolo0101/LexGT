@@ -1,48 +1,21 @@
-"use client"
+"use client";
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import type { Annotation, Tier } from "@/lib/types";
+import type { Tier } from "@/lib/types";
 import type { ActionResult } from "@/lib/action-result";
 import { saveAnnotation, deleteAnnotation, updateAnnotationNote } from "@/app/leyes/actions";
 import { addAnnotationToCase } from "@/app/casos/actions";
 import { createClient } from "@/lib/supabase";
-import { HL_TOKENS } from "@/lib/case-colors";
+import { HL_TOKENS, HL_MARK_CLASS, type HighlightColor } from "@/lib/case-colors";
 import { ANCHOR_CONTEXT_LENGTH } from "@/lib/anchoring";
 import PaywallModal from "./PaywallModal";
 
-type AnnotationColor = 'yellow' | 'green' | 'blue' | 'pink';
+const COLORS: HighlightColor[] = ["yellow", "green", "blue", "pink"];
 
-const COLOR_BG: Record<AnnotationColor, string> = {
-  yellow: 'bg-yellow-200',
-  green:  'bg-green-200',
-  blue:   'bg-blue-200',
-  pink:   'bg-pink-200',
-};
-
-const COLORS: AnnotationColor[] = ['yellow', 'green', 'blue', 'pink'];
-
-type Segment =
-  | { kind: "text"; text: string }
-  | { kind: "mark"; text: string; annotationId: string; color: AnnotationColor; note: string | null };
-
-function buildSegments(text: string, annotations: Annotation[]): Segment[] {
-  const sorted = [...annotations].sort((a, b) => a.char_start - b.char_start);
-  const result: Segment[] = [];
-  let cursor = 0;
-  for (const ann of sorted) {
-    const start = Math.max(ann.char_start, cursor);
-    const end = Math.min(ann.char_end, text.length);
-    if (start >= end) continue;
-    if (start > cursor) result.push({ kind: "text", text: text.slice(cursor, start) });
-    result.push({ kind: "mark", text: text.slice(start, end), annotationId: ann.id, color: (ann.color as AnnotationColor) || 'yellow', note: ann.note });
-    cursor = end;
-  }
-  if (cursor < text.length) result.push({ kind: "text", text: text.slice(cursor) });
-  return result;
-}
-
+// Offset de caracteres dentro del párrafo, contando solo nodos de texto — el
+// mismo cálculo que espera `annotations.char_start/char_end`.
 function getCharOffset(container: HTMLElement, node: Node, nodeOffset: number): number {
   let total = 0;
   const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
@@ -55,31 +28,56 @@ function getCharOffset(container: HTMLElement, node: Node, nodeOffset: number): 
 }
 
 type TooltipState =
-  | { kind: "new"; x: number; y: number; start: number; end: number }
-  | { kind: "existing"; x: number; y: number; annotationId: string; currentNote: string | null };
+  | {
+      kind: "new";
+      x: number;
+      y: number;
+      start: number;
+      end: number;
+      paragraphId: string;
+      articleId: string;
+      text: string;
+    }
+  | { kind: "existing"; x: number; y: number; annotationId: string };
 
 type UserCase = { id: string; title: string; color: string };
 
-export default function ParagraphHighlighter({
-  text,
-  annotations,
-  paragraphId,
-  articleId,
+/**
+ * Superficie de lectura: UN solo componente cliente para toda la ley.
+ *
+ * Los párrafos los renderiza el servidor (`ParagraphText`) como HTML plano con
+ * `data-paragraph-id` / `data-article-id`, y aquí se delegan los eventos. La
+ * versión anterior montaba un componente cliente por párrafo, lo que era viable
+ * con un capítulo a la vez pero no con una ley completa (el Código Civil tiene
+ * 2,894 párrafos).
+ *
+ * Al guardar o borrar un highlight se parcha el DOM directamente en vez de
+ * llamar a `router.refresh()`: refrescar re-renderiza la ley entera en el
+ * servidor. Solo las notas —mucho menos frecuentes— fuerzan un refresh, porque
+ * el panel derecho las lista.
+ */
+export default function ReaderSurface({
   isAuthenticated,
   tier,
+  notesById,
+  className,
+  children,
 }: {
-  text: string;
-  annotations: Annotation[];
-  paragraphId: string;
-  articleId: string;
   isAuthenticated: boolean;
   tier: Tier;
+  notesById: Record<string, string | null>;
+  className?: string;
+  children: React.ReactNode;
 }) {
-  const containerRef = useRef<HTMLSpanElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
+  const pendingRangeRef = useRef<Range | null>(null);
+  const activeMarkRef = useRef<HTMLElement | null>(null);
+
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
-  const [selectedColor, setSelectedColor] = useState<AnnotationColor>('yellow');
-  const [noteText, setNoteText] = useState('');
+  const [selectedColor, setSelectedColor] = useState<HighlightColor>("yellow");
+  const [noteText, setNoteText] = useState("");
+  const [localNotes, setLocalNotes] = useState<Record<string, string | null>>({});
   const [casesOpen, setCasesOpen] = useState(false);
   const [userCases, setUserCases] = useState<UserCase[] | null>(null);
   const [casesLoading, setCasesLoading] = useState(false);
@@ -90,72 +88,147 @@ export default function ParagraphHighlighter({
 
   const handleActionResult = (result: ActionResult<unknown>) => {
     if (result.ok) return;
-    if (result.code === "PRO_REQUIRED") {
-      setPaywallOpen(true);
-    } else {
-      setActionError(result.message);
-    }
+    if (result.code === "PRO_REQUIRED") setPaywallOpen(true);
+    else setActionError(result.message);
   };
+
+  const closeTooltip = useCallback(() => {
+    setTooltip(null);
+    setCasesOpen(false);
+    setActionError(null);
+  }, []);
 
   useEffect(() => {
     const dismiss = (e: MouseEvent) => {
       if (tooltipRef.current?.contains(e.target as Node)) return;
-      setTooltip(null);
-      setCasesOpen(false);
+      closeTooltip();
     };
     document.addEventListener("mousedown", dismiss);
     return () => document.removeEventListener("mousedown", dismiss);
-  }, []);
+  }, [closeTooltip]);
 
   const handleMouseUp = useCallback(() => {
     if (!isAuthenticated) return;
     const sel = window.getSelection();
-    if (!sel || sel.isCollapsed || !containerRef.current) return;
+    if (!sel || sel.isCollapsed || sel.rangeCount === 0) return;
 
     const range = sel.getRangeAt(0);
-    if (!containerRef.current.contains(range.commonAncestorContainer)) return;
+    const anchor =
+      range.startContainer.nodeType === Node.TEXT_NODE
+        ? range.startContainer.parentElement
+        : (range.startContainer as Element);
+    const paragraph = anchor?.closest<HTMLElement>("[data-paragraph-id]");
+    // Una selección que cruza párrafos no se puede anclar a un solo
+    // `paragraph_id`; se ignora en vez de guardar algo incorrecto.
+    if (!paragraph || !paragraph.contains(range.endContainer)) return;
 
-    const start = getCharOffset(containerRef.current, range.startContainer, range.startOffset);
-    const end = getCharOffset(containerRef.current, range.endContainer, range.endOffset);
+    const start = getCharOffset(paragraph, range.startContainer, range.startOffset);
+    const end = getCharOffset(paragraph, range.endContainer, range.endOffset);
     if (start >= end) return;
 
     const rect = range.getBoundingClientRect();
-    setTooltip({ kind: "new", x: rect.left + rect.width / 2, y: rect.top - 4, start, end });
+    pendingRangeRef.current = range.cloneRange();
+    setActionError(null);
+    setTooltip({
+      kind: "new",
+      x: rect.left + rect.width / 2,
+      y: rect.top - 4,
+      start,
+      end,
+      paragraphId: paragraph.dataset.paragraphId!,
+      articleId: paragraph.dataset.articleId!,
+      text: paragraph.textContent ?? "",
+    });
   }, [isAuthenticated]);
 
-  const handleMarkClick = useCallback((e: React.MouseEvent, annotationId: string, note: string | null) => {
-    e.stopPropagation();
-    if (!isAuthenticated) return;
-    setNoteText(note ?? '');
-    setCasesOpen(false);
-    setTooltip({ kind: "existing", x: e.clientX, y: e.clientY - 4, annotationId, currentNote: note });
-  }, [isAuthenticated]);
+  const handleClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (!isAuthenticated) return;
+      const mark = (e.target as HTMLElement).closest<HTMLElement>("mark[data-annotation-id]");
+      if (!mark) return;
+      e.stopPropagation();
+      const annotationId = mark.dataset.annotationId!;
+      activeMarkRef.current = mark;
+      setNoteText(localNotes[annotationId] ?? notesById[annotationId] ?? "");
+      setCasesOpen(false);
+      setActionError(null);
+      setTooltip({ kind: "existing", x: e.clientX, y: e.clientY - 4, annotationId });
+    },
+    [isAuthenticated, localNotes, notesById]
+  );
+
+  // Inserta el <mark> recién guardado sin volver a pedir la ley al servidor.
+  const paintMark = (annotationId: string, color: HighlightColor) => {
+    const range = pendingRangeRef.current;
+    if (!range) return;
+    try {
+      const mark = document.createElement("mark");
+      mark.className = HL_MARK_CLASS[color];
+      mark.dataset.annotationId = annotationId;
+      mark.appendChild(range.extractContents());
+      range.insertNode(mark);
+    } catch {
+      // Rango inválido (el DOM cambió): el servidor ya tiene la anotación, así
+      // que basta con re-renderizar para verla.
+      router.refresh();
+    } finally {
+      pendingRangeRef.current = null;
+    }
+  };
+
+  const unpaintMark = (annotationId: string) => {
+    const mark =
+      activeMarkRef.current?.dataset.annotationId === annotationId
+        ? activeMarkRef.current
+        : rootRef.current?.querySelector<HTMLElement>(`mark[data-annotation-id="${annotationId}"]`);
+    if (!mark) return;
+    mark.replaceWith(...Array.from(mark.childNodes));
+    activeMarkRef.current = null;
+  };
 
   const handleSave = () => {
     if (!tooltip || tooltip.kind !== "new") return;
-    const { start, end } = tooltip;
+    const { start, end, paragraphId, articleId, text } = tooltip;
+    const color = selectedColor;
     setTooltip(null);
     window.getSelection()?.removeAllRanges();
     setActionError(null);
+
     const quote = text.slice(start, end);
     const prefix = text.slice(Math.max(0, start - ANCHOR_CONTEXT_LENGTH), start);
     const suffix = text.slice(end, end + ANCHOR_CONTEXT_LENGTH);
+
     startTransition(async () => {
-      const result = await saveAnnotation({ paragraph_id: paragraphId, article_id: articleId, char_start: start, char_end: end, quote, prefix, suffix, color: selectedColor });
+      const result = await saveAnnotation({
+        paragraph_id: paragraphId,
+        article_id: articleId,
+        char_start: start,
+        char_end: end,
+        quote,
+        prefix,
+        suffix,
+        color,
+      });
       handleActionResult(result);
-      if (result.ok) router.refresh();
+      if (result.ok) paintMark(result.data.id, color);
+      else pendingRangeRef.current = null;
     });
   };
 
   const handleSaveNote = () => {
     if (!tooltip || tooltip.kind !== "existing") return;
     const { annotationId } = tooltip;
+    const note = noteText || null;
     setTooltip(null);
     setActionError(null);
     startTransition(async () => {
-      const result = await updateAnnotationNote(annotationId, noteText || null);
+      const result = await updateAnnotationNote(annotationId, note);
       handleActionResult(result);
-      if (result.ok) router.refresh();
+      if (result.ok) {
+        setLocalNotes((prev) => ({ ...prev, [annotationId]: note }));
+        // El panel derecho lista las notas desde el servidor.
+        router.refresh();
+      }
     });
   };
 
@@ -167,7 +240,10 @@ export default function ParagraphHighlighter({
     startTransition(async () => {
       const result = await deleteAnnotation(annotationId);
       handleActionResult(result);
-      if (result.ok) router.refresh();
+      if (result.ok) {
+        unpaintMark(annotationId);
+        if (localNotes[annotationId] != null || notesById[annotationId] != null) router.refresh();
+      }
     });
   };
 
@@ -197,25 +273,11 @@ export default function ParagraphHighlighter({
     });
   };
 
-  const segments = buildSegments(text, annotations);
-
   return (
     <>
-      <span ref={containerRef} onMouseUp={handleMouseUp}>
-        {segments.map((seg, i) =>
-          seg.kind === "mark" ? (
-            <mark
-              key={i}
-              className={`${COLOR_BG[seg.color] ?? 'bg-yellow-200'} rounded-sm cursor-pointer`}
-              onClick={(e) => handleMarkClick(e, seg.annotationId, seg.note)}
-            >
-              {seg.text}
-            </mark>
-          ) : (
-            <span key={i}>{seg.text}</span>
-          )
-        )}
-      </span>
+      <div ref={rootRef} className={className} onMouseUp={handleMouseUp} onClick={handleClick}>
+        {children}
+      </div>
 
       {tooltip &&
         createPortal(
@@ -227,16 +289,18 @@ export default function ParagraphHighlighter({
             {tooltip.kind === "new" ? (
               <div className="bg-navy-900 text-white rounded-lg shadow-xl px-3 py-2 flex items-center gap-3">
                 <div className="flex items-center gap-1.5">
-                  {(tier === 'pro' ? COLORS : (['yellow'] as AnnotationColor[])).map((c) => (
+                  {(tier === "pro" ? COLORS : (["yellow"] as HighlightColor[])).map((c) => (
                     <button
                       key={c}
                       onClick={() => setSelectedColor(c)}
-                      className={`w-4 h-4 rounded-full transition-all ${selectedColor === c ? 'ring-2 ring-gold-400 ring-offset-1 ring-offset-navy-900' : ''}`}
+                      className={`w-4 h-4 rounded-full transition-all ${
+                        selectedColor === c ? "ring-2 ring-gold-400 ring-offset-1 ring-offset-navy-900" : ""
+                      }`}
                       style={{ backgroundColor: HL_TOKENS[c].swatch }}
                       aria-label={HL_TOKENS[c].label}
                     />
                   ))}
-                  {tier !== 'pro' && (
+                  {tier !== "pro" && (
                     <span className="text-[10px] text-navy-100/60 ml-1 whitespace-nowrap">+3 en Pro</span>
                   )}
                 </div>
@@ -251,7 +315,7 @@ export default function ParagraphHighlighter({
               </div>
             ) : (
               <div className="bg-navy-900 text-white rounded-lg shadow-xl p-2 flex flex-col gap-2 min-w-[180px]">
-                {tier === 'pro' && (
+                {tier === "pro" && (
                   <>
                     <textarea
                       value={noteText}
@@ -305,17 +369,14 @@ export default function ParagraphHighlighter({
                 >
                   {pending ? "…" : "Eliminar"}
                 </button>
-                {actionError && (
-                  <p className="text-xs text-red-300">{actionError}</p>
-                )}
+                {actionError && <p className="text-xs text-red-300">{actionError}</p>}
               </div>
             )}
           </div>,
           document.body
         )}
 
-      {paywallOpen &&
-        createPortal(<PaywallModal onClose={() => setPaywallOpen(false)} />, document.body)}
+      {paywallOpen && createPortal(<PaywallModal onClose={() => setPaywallOpen(false)} />, document.body)}
     </>
   );
 }

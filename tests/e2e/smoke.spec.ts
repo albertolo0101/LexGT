@@ -1,26 +1,41 @@
 import { test, expect } from "@playwright/test";
 
-test("anonymous user reads an article", async ({ page }) => {
-  await page.goto("/leyes/codigo-civil");
+test("anonymous user reads a law as one continuous document", async ({ page }) => {
+  await page.goto("/leyes/codigo-de-trabajo");
 
-  const sectionLink = page.locator('a[href*="/leyes/codigo-civil/"]').first();
-  await sectionLink.click();
-
+  // La ley completa se sirve en una sola página: los artículos están en el HTML
+  // inicial, sin navegar a un capítulo.
   await expect(page.locator('[id^="articulo-"]').first()).toBeVisible();
+  expect(await page.locator('[id^="articulo-"]').count()).toBeGreaterThan(50);
+});
+
+test("the table of contents scrolls to a chapter", async ({ page }) => {
+  await page.goto("/leyes/codigo-de-trabajo");
+
+  const tocLink = page.locator("a[data-toc-id]").nth(1);
+  const anchor = await tocLink.getAttribute("href");
+  await tocLink.click();
+
+  await expect(page.locator(anchor!)).toBeInViewport({ timeout: 5000 });
 });
 
 test("cmd+k search navigates to an article anchor", async ({ page }) => {
   await page.goto("/leyes");
 
-  await page.keyboard.press("ControlOrMeta+k");
-  const overlay = page.locator("form").filter({ hasText: "ESC" });
+  const overlay = page.locator("form").filter({ has: page.locator("kbd", { hasText: "ESC" }) });
+  // El atajo vive en un listener de ShellClient: reintentar hasta que hidrate.
+  await expect(async () => {
+    await page.keyboard.press("ControlOrMeta+k");
+    await expect(overlay).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 20000 });
+
   await overlay.getByPlaceholder("Buscar leyes, artículos, palabras clave…").fill("contrato");
 
   const result = page.locator("ul li button").first();
   await expect(result).toBeVisible();
   await result.click();
 
-  await expect(page).toHaveURL(/\/leyes\/[^/]+\/[^#]+#articulo-/);
+  await expect(page).toHaveURL(/\/leyes\/[^/#]+#articulo-/);
 });
 
 const FREE_EMAIL = process.env.PLAYWRIGHT_FREE_USER_EMAIL;
@@ -41,10 +56,9 @@ test.describe("authenticated free user", () => {
   });
 
   test("saves a yellow highlight and it persists on reload", async ({ page }) => {
-    await page.goto("/leyes/codigo-civil");
-    await page.locator('a[href*="/leyes/codigo-civil/"]').first().click();
+    await page.goto("/leyes/ley-de-orden-publico");
 
-    const paragraph = page.locator("p").filter({ hasText: /.{20,}/ }).first();
+    const paragraph = page.locator("[data-paragraph-id]").filter({ hasText: /.{40,}/ }).first();
     const text = await paragraph.innerText();
 
     await paragraph.evaluate((el) => {
@@ -68,8 +82,7 @@ test.describe("authenticated free user", () => {
   });
 
   test("free user opens the right panel and the notes tab shows the paywall", async ({ page }) => {
-    await page.goto("/leyes/codigo-civil");
-    await page.locator('a[href*="/leyes/codigo-civil/"]').first().click();
+    await page.goto("/leyes/ley-de-orden-publico");
 
     await page.getByRole("button", { name: "Notas" }).click();
     await page.getByRole("button", { name: "Conocer Pro" }).click();

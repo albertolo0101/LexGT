@@ -5,6 +5,7 @@ import { Ico } from '@/components/icons'
 import { HL_COLORS } from '@/lib/case-colors'
 import PaywallModal from '@/components/PaywallModal'
 import type { LawReform } from '@/lib/types'
+import { articleAnchor } from '@/lib/anchors'
 import type { NoteItem, OrphanedAnnotation } from './types'
 
 const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
@@ -28,15 +29,14 @@ export default function RightPanel({
   notes,
   orphanedAnnotations,
   reforms,
-  lawSlug,
 }: {
   tier: 'anonymous' | 'free' | 'pro'
   notes: NoteItem[]
   orphanedAnnotations: OrphanedAnnotation[]
   reforms: LawReform[]
-  lawSlug: string
 }) {
-  const [open, setOpen] = useState(true)
+  // Colapsado por defecto: la hoja de lectura es la prioridad de la pantalla.
+  const [open, setOpen] = useState(false)
   const [tab, setTab] = useState<Tab>(notes.length > 0 || orphanedAnnotations.length > 0 ? 'notas' : 'historial')
   const [paywallOpen, setPaywallOpen] = useState(false)
 
@@ -91,7 +91,7 @@ export default function RightPanel({
                       {notes.map((n) => (
                         <li key={n.id}>
                           <a
-                            href={n.sectionId ? `/leyes/${lawSlug}/${n.sectionId}#articulo-${n.articleNumber}` : '#'}
+                            href={`#${articleAnchor(n.articleNumber)}`}
                             className="block rounded-lg border border-rule p-3 hover:border-gold-400 transition-colors"
                           >
                             <p className="text-[10px] font-semibold uppercase tracking-widest text-ink-400 mb-1">
@@ -119,7 +119,7 @@ export default function RightPanel({
                         {orphanedAnnotations.map((o) => (
                           <li key={o.id}>
                             <a
-                              href={o.sectionId ? `/leyes/${lawSlug}/${o.sectionId}#articulo-${o.articleNumber}` : '#'}
+                              href={`#${articleAnchor(o.articleNumber)}`}
                               className="block rounded-lg border border-amber-300 bg-amber-50 p-3 hover:border-amber-400 transition-colors"
                             >
                               <p className="text-[10px] font-semibold uppercase tracking-widest text-ink-400 mb-1">

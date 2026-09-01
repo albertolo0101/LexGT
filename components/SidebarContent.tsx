@@ -100,8 +100,8 @@ export default function SidebarContent({
                       ].join(' ')}
                     >
                       <span className="truncate">
-                        {law.decree && <span className="text-ink-400 mr-1">{law.decree}</span>}
                         {law.short_name}
+                        {law.decree && <span className="ml-1.5 text-ink-400/70">{law.decree}</span>}
                       </span>
                       {law.hasAlert && (
                         <span className="w-1.5 h-1.5 rounded-full bg-gold-500 animate-pulse-gold flex-shrink-0" />

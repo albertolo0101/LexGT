@@ -77,3 +77,79 @@ body {
 .lex-fade {
   animation: lexFade 0.18s ease-out both;
 }
+
+/* ── Vista de lectura ────────────────────────────────────────────────────
+   La ley completa se renderiza como una "hoja" continua. Estas cuatro
+   variables son las perillas de ajuste: ancho de la hoja, margen interno,
+   tamaño y altura de línea del texto. Cambiar aquí afecta todo el documento. */
+:root {
+  --doc-width: 63rem;        /* ancho de la hoja  ≈ 1008px */
+  --doc-padding: 4.5rem;     /* margen interno tipo página impresa */
+  --doc-font-size: 1.09rem;  /* ≈ 17.5px */
+  --doc-line-height: 1.78;
+}
+
+.doc-sheet {
+  width: 100%;
+  max-width: var(--doc-width);
+  padding: 3.25rem var(--doc-padding) 6rem;
+  background: #fff;
+  border: 1px solid var(--color-rule);
+  border-radius: 2px;
+  box-shadow: 0 1px 2px rgba(22, 22, 22, 0.04), 0 10px 30px -18px rgba(22, 22, 22, 0.35);
+}
+
+@media (max-width: 640px) {
+  .doc-sheet { padding: 1.75rem 1.25rem 4rem; }
+  :root { --doc-font-size: 1.03rem; }
+}
+
+.doc-text {
+  margin-top: 0.75em;
+  font-family: var(--font-serif);
+  font-size: var(--doc-font-size);
+  line-height: var(--doc-line-height);
+  color: var(--color-ink-700);
+  text-align: justify;
+  hyphens: auto;
+}
+
+.doc-text-empty { color: var(--color-ink-400); font-style: italic; }
+
+.doc-article { margin-top: 1.9rem; scroll-margin-top: 1.5rem; }
+
+.doc-article-num {
+  font-weight: 600;
+  color: var(--color-navy-800);
+  margin-right: 0.35em;
+}
+
+.doc-article-epigraph {
+  font-weight: 600;
+  color: var(--color-gold-700);
+  margin-right: 0.35em;
+}
+
+.doc-section { margin: 3.25rem 0 1.5rem; text-align: center; scroll-margin-top: 1.5rem; }
+.doc-section-d0 { margin-top: 4.5rem; padding-top: 2.75rem; border-top: 1px solid var(--color-rule); }
+.doc-section-d2 { margin-top: 2.5rem; }
+.doc-section:first-of-type { margin-top: 0.5rem; padding-top: 0; border-top: none; }
+
+.doc-section-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--color-gold-700);
+}
+
+.doc-section-heading {
+  margin-top: 0.35rem;
+  font-family: var(--font-serif);
+  font-size: 1.4rem;
+  line-height: 1.3;
+  color: var(--color-ink-900);
+}
+
+.doc-section-d1 .doc-section-heading { font-size: 1.2rem; }
+.doc-section-d2 .doc-section-heading { font-size: 1.05rem; }

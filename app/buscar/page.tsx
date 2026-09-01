@@ -2,6 +2,7 @@ import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { searchArticles } from '@/lib/services/queries/search'
 import Link from 'next/link'
 import type { Metadata } from 'next'
+import { articleAnchor } from "@/lib/anchors";
 
 type Props = { searchParams: Promise<{ q?: string; law?: string }> }
 
@@ -52,7 +53,7 @@ export default async function BuscarPage({ searchParams }: Props) {
             {results.map((r) => (
               <li key={r.article_id}>
                 <Link
-                  href={`/leyes/${r.law_slug}/${r.section_id}#articulo-${r.article_number}`}
+                  href={`/leyes/${r.law_slug}#${articleAnchor(r.article_number)}`}
                   className="block py-5 hover:bg-gray-50 -mx-3 px-3 rounded transition-colors group"
                 >
                   <p className="text-[13px] font-semibold text-gray-900 mb-1 group-hover:text-gray-700">

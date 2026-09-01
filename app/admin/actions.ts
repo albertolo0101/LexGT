@@ -2,6 +2,8 @@
 
 import { createServerSupabaseClient } from "@/lib/supabase-server"
 import { redirect } from "next/navigation"
+import { revalidateTag } from "next/cache"
+import { LAW_CONTENT_TAG } from "@/lib/cache/law-content"
 import { getActor } from "@/lib/authz"
 import { runAction, type ActionResult } from "@/lib/action-result"
 import * as adminService from "@/lib/services/admin"
@@ -40,6 +42,7 @@ export async function approveReform(reformId: string): Promise<ActionResult<void
     const actor = await getActor(supabase)
     const input = reformsService.ApproveReformInput.parse({ reformId })
     await reformsService.approveReform(supabase, actor, input)
+    revalidateTag(LAW_CONTENT_TAG)
   })
 
   if (result.ok) redirect("/admin")
@@ -54,7 +57,9 @@ export async function correctParagraphText(data: {
     const supabase = await createServerSupabaseClient()
     const actor = await getActor(supabase)
     const input = adminService.CorrectParagraphTextInput.parse(data)
-    return adminService.correctParagraphText(supabase, actor, input)
+    const result = await adminService.correctParagraphText(supabase, actor, input)
+    revalidateTag(LAW_CONTENT_TAG)
+    return result
   })
 }
 
