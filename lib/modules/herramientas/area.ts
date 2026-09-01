@@ -115,9 +115,4 @@ export function convertArea(m2: number): AreaConversions {
   }
 }
 
-export function formatNumber(value: number, decimals = 2): string {
-  return new Intl.NumberFormat('es-GT', {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  }).format(value)
-}
+export { formatNumber } from './format'

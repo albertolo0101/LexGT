@@ -20,8 +20,8 @@ Tres tiers: **anónimo** (lectura + búsqueda, ventana de reformas 7 días),
 
 ## Estado (2026-08-31)
 
-- `npx tsc --noEmit`, `npm run lint`, `npm run test` (96), `npm run build`:
-  verdes. `npm run test:e2e`: 5/5 anónimos (2 autenticados en skip).
+- `npx tsc --noEmit`, `npm run lint`, `npm run test` (141), `npm run build`:
+  verdes. `npm run test:e2e`: 8/8 anónimos (2 autenticados en skip).
   `npm run test:rls` (pgTAP): 15/15 con Docker corriendo.
 - Plan de remediación arquitectónica **Phases 0-7 completo** — seguridad
   cerrada a nivel RLS, capa de servicios, API v1, anclaje de anotaciones v2,
@@ -173,7 +173,8 @@ app/
       page.tsx                    → compone índice + hoja + panel derecho
       LawToc.tsx                  → índice sticky con scroll-spy (cliente)
       RevisionLed.tsx             → LED verde "texto al día" + fecha de la
-                                    última reforma (o de carga de la ley)
+                                    última revisión del Diario de Centro
+                                    América (misma para todas las leyes)
       DocHeader.tsx               → portada del documento
       ArticleBlock.tsx            → artículo (entrada corrida "Artículo N.")
       ParagraphText.tsx           → párrafo anotable, 100% servidor
@@ -190,9 +191,12 @@ app/
                                     addAnnotationToCase, removeAnnotationFromCase
   herramientas/                  → herramientas públicas, 100% cliente
     page.tsx                     → índice
-    ToolHeader.tsx               → migas + título
+    ToolHeader.tsx, ui.ts        → migas + título, clases compartidas
     prestaciones/                → indemnización, aguinaldo, bono 14,
                                     vacaciones por tiempo servido
+    plazos/                      → vencimiento en días hábiles (Art. 45 LOJ)
+    timbres/                     → timbre notarial + fiscal y denominaciones
+    arancel/                     → honorarios mínimos del Decreto 111-96
     area/                        → área de polígono por coordenadas o por
                                     rumbos y distancias + unidades agrarias
   auth/actions.ts (signOut), login/page.tsx, register/page.tsx
@@ -230,9 +234,14 @@ lib/
   services/           → annotations.ts, cases.ts, reforms.ts, admin.ts (+tests)
   services/queries/   → laws.ts, reading.ts, search.ts, cases.ts (+tests)
   tools.ts            → catálogo de herramientas (menú + índice)
+  revision.ts         → `GAZETTE_REVIEWED_ON`: fecha de la última revisión del
+                         Diario de Centro América. **Se actualiza a mano cada
+                         vez que se cierra una revisión del diario oficial**;
+                         es lo único que mueve el LED del lector.
   modules/calc-laboral/ → schemas.ts, service.ts, README.md (+tests)
-  modules/herramientas/ → prestaciones.ts, area.ts — cálculo puro, sin
-                         `server-only`: lo importan las páginas cliente (+tests)
+  modules/herramientas/ → prestaciones.ts, plazos.ts, timbres.ts, arancel.ts,
+                         area.ts, format.ts — cálculo puro, sin `server-only`:
+                         lo importan las páginas cliente (+tests)
   test/               → mock-supabase.ts, empty-module.ts
 
 middleware.ts         → refresca la cookie de sesión; protege /admin/*
@@ -275,7 +284,48 @@ hermanas (pendiente).
 
 ---
 
-## Última sesión (2026-08-31, parte 3)
+## Última sesión (2026-08-31, parte 4)
+
+**Cinco herramientas y el LED de vigencia global.**
+
+- El LED del lector ya no muestra la fecha de reforma de cada ley: muestra la
+  **última revisión del Diario de Centro América**, la misma para todo el
+  catálogo, en `lib/revision.ts` (`GAZETTE_REVIEWED_ON`). Bumpear esa constante
+  es lo único que hay que hacer al cerrar una revisión del diario.
+- Tres herramientas nuevas, con el mismo patrón (módulo puro + test + página
+  cliente + alta en `lib/tools.ts`):
+  - **Plazos** — vencimiento en días hábiles, calendario, meses o años.
+    Fundamento verificado contra el texto que ya está en la base: Art. 45 d) y
+    e) de la LOJ (el plazo corre desde el día siguiente a la notificación; no
+    se cuentan domingos, sábados de descanso, feriados ni los días de cierre
+    del tribunal) y Art. 127 del Código de Trabajo para los asuetos. Semana
+    Santa se deriva de la Pascua (algoritmo gregoriano). Acepta días inhábiles
+    adicionales, que es justo lo que contempla el Art. 45 d).
+  - **Timbres** — timbre notarial (Decreto 82-96: 2 por millar, piso Q1, techo
+    Q300; Q10 en actas, legalizaciones, protocolaciones y valor indeterminado),
+    timbre fiscal (Decreto 37-92: 3%, excluyente del IVA) y papel de protocolo
+    (valor por hoja editable, no una constante escondida). Devuelve el desglose
+    de denominaciones con programación dinámica — el algoritmo voraz falla
+    (Q0.30 son tres timbres de Q0.10) — y avisa cuando hay que redondear
+    porque no existe timbre para el remanente exacto.
+  - **Arancel** — honorarios mínimos del Decreto 111-96: regla general
+    (15%/5%), ejecuciones (10%/5%), sucesorios (7%/3%/1%, Art. 8), jurisdicción
+    voluntaria (Q800 + 5%, Art. 9) y casación/amparo (Q1,500–Q5,000); segunda
+    instancia = mitad.
+- Prestaciones y plazos enlazan a su artículo dentro del lector.
+- El texto completo del 111-96, del 82-96 y del 37-92 **no está en la base**:
+  los porcentajes salen de fuentes secundarias y las herramientas lo dicen en
+  pantalla ("cálculo referencial"). Cargar esas tres leyes con el extractor es
+  el siguiente paso natural para poder citarlas con enlace.
+- Verificado: `tsc`, `lint`, 141 unit tests, `build` y 8/8 e2e anónimos contra
+  el build de producción (tres nuevos: plazos, timbres y arancel).
+
+Siguiente sesión: ejecutar `docs/DEPLOY.md` (deploy a Vercel) y, después, la
+recarga por ley del contenido desde `lex-extractor`.
+
+---
+
+## Sesión previa (2026-08-31, parte 3)
 
 **Casos, lector y herramientas.**
 
@@ -292,8 +342,9 @@ hermanas (pendiente).
 - **Lector:** el panel derecho (Notas/Caso/Concordancias/Historial) abre
   **abierto** y arranca en Notas; cerrado deja una pestaña dorada vertical
   "Herramientas", mucho más visible que el icono anterior. Arriba del
-  documento hay un LED verde con la fecha de última reforma o revisión
-  (`RevisionLed`).
+  documento hay un LED verde (`RevisionLed`) con la fecha de la última
+  revisión del **Diario de Centro América** — una sola fecha para todo el
+  catálogo, en `lib/revision.ts`, no la fecha de reforma de cada ley.
 - **Contraste:** los formularios de caso, el pie de la barra lateral y los
   textos del panel derecho pasaron de gris claro a tinta oscura.
 - **Herramientas:** dropdown nuevo en la barra superior, junto al buscador, e
@@ -310,5 +361,3 @@ hermanas (pendiente).
   desde el caso y el panel de anotación con un usuario real — sigue faltando
   la cuenta de prueba.
 
-Siguiente sesión: ejecutar `docs/DEPLOY.md` (deploy a Vercel) y, después, la
-recarga por ley del contenido desde `lex-extractor`.

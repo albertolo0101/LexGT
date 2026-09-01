@@ -54,6 +54,38 @@ test.describe("herramientas", () => {
     await expect(page.getByText("Q 24,000.00")).toBeVisible();
   });
 
+  test("la calculadora de plazos salta fin de semana y asueto", async ({ page }) => {
+    await page.goto("/herramientas/plazos");
+
+    await page.locator("#notificacion").fill("2026-09-10");
+    await page.locator("#cantidad").fill("3");
+
+    // Viernes 11 (día 1), sábado y domingo fuera, lunes 14 (día 2), el martes 15
+    // es asueto de Independencia, miércoles 16 (día 3).
+    await expect(page.getByText("miércoles 16 de septiembre de 2026")).toBeVisible();
+    await expect(page.getByText("Día de la Independencia")).toBeVisible();
+  });
+
+  test("la calculadora de timbres desglosa las denominaciones", async ({ page }) => {
+    await page.goto("/herramientas/timbres");
+
+    await page.selectOption("#acto", "mutuo");
+    await page.locator("#valor").fill("100000");
+
+    await expect(page.getByText("Q 200.00")).toBeVisible(); // 2 por millar
+    await expect(page.getByText("Q 3,000.00")).toBeVisible(); // 3% de timbre fiscal
+    await expect(page.getByText("30 × Q 100.00")).toBeVisible();
+  });
+
+  test("la calculadora de arancel aplica la escala del proceso sucesorio", async ({ page }) => {
+    await page.goto("/herramientas/arancel");
+
+    await page.selectOption("#asunto", "sucesorio");
+    await page.locator("#cuantia").fill("600000");
+
+    await expect(page.getByText("Q 18,000.00")).toBeVisible();
+  });
+
   test("la calculadora de área resuelve un polígono por coordenadas", async ({ page }) => {
     await page.goto("/herramientas/area");
 

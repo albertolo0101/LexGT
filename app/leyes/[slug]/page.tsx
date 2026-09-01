@@ -62,10 +62,7 @@ export default async function LawReadingPage({ params }: Props) {
             notesById={notesById}
             className="doc-sheet"
           >
-            <RevisionLed
-              revisedAt={reforms[0]?.published_at ?? law.created_at}
-              hasReforms={reforms.length > 0}
-            />
+            <RevisionLed />
 
             <NotifBanner lawSlug={slug} show={actor.tier === "pro" && hasUnseenReform} />
 

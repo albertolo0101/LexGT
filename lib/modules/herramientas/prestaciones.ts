@@ -126,11 +126,4 @@ export function calcularPrestaciones(input: PrestacionesInput): PrestacionesResu
   }
 }
 
-export function formatQ(amount: number): string {
-  return new Intl.NumberFormat('es-GT', {
-    style: 'currency',
-    currency: 'GTQ',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount)
-}
+export { formatQ } from './format'
