@@ -20,14 +20,17 @@ Tres tiers: **anónimo** (lectura + búsqueda, ventana de reformas 7 días),
 
 ## Estado (2026-08-31)
 
-- `npx tsc --noEmit`, `npm run lint`, `npm run test` (146), `npm run build`:
+- `npx tsc --noEmit`, `npm run lint`, `npm run test` (157), `npm run build`:
   verdes. `npm run test:e2e`: 8/8 anónimos (3 autenticados en skip).
+  `supabase/tests/database/rls.test.sql` tiene 21 asserts (6 nuevos de cobros)
+  pero **no se pudieron correr**: esta máquina no tiene Docker.
   `npm run test:rls` (pgTAP): 15/15 con Docker corriendo.
 - Plan de remediación arquitectónica **Phases 0-7 completo** — seguridad
   cerrada a nivel RLS, capa de servicios, API v1, anclaje de anotaciones v2,
   CI, convención de módulos. Resumen por fase en `docs/ROADMAP.md`.
-- Prod (`enrykddxhqsibbokrood`): migraciones hasta `0019` aplicadas; `0020`
-  espera la recarga de contenido. 16 leyes, 6,330 artículos, 4 usuarios.
+- Prod (`enrykddxhqsibbokrood`): migraciones hasta `0019` y la `0021`
+  (cobros) aplicadas; `0020` espera la recarga de contenido. 16 leyes,
+  6,330 artículos, 4 usuarios.
 - **Siguiente paso: Phase 12 — deploy de prueba a Vercel**, con la app tal
   como está. Runbook: `docs/DEPLOY.md`.
 
@@ -61,7 +64,15 @@ Matriz completa en `docs/SECURITY.md`.
   patrón.
 - **`user_profiles.tier` / `tier_expires_at` / `tier_source`** solo los
   escribe un admin (política + trigger `prevent_tier_self_update`).
-- La app **nunca** usa la `service_role` key.
+- La app **nunca** usa la `service_role` key, **con una sola excepción**:
+  `app/api/webhooks/[provider]/route.ts`, que no tiene sesión de usuario
+  porque lo llama el proveedor de pagos. Vive tras verificación de firma y es
+  el único importador de `lib/supabase-service.ts`.
+- **Los cambios de tier pasan por `apply_tier()`**, venga el cambio de un pago,
+  del panel de admin o de lex-extractor: así la bitácora (`tier_events`) es
+  una sola. Nada de `UPDATE user_profiles` a mano.
+- **LexGT no ve datos de tarjeta.** El cobro ocurre en el checkout alojado del
+  proveedor; aquí solo entra plan, monto, estado y a quién otorgar el tier.
 
 ---
 
@@ -130,7 +141,13 @@ Matriz completa en `docs/SECURITY.md`.
     descarta (borraba la nota a medio escribir) y guardar en un caso lo deja
     abierto con la confirmación. El panel de una selección nueva sí se
     descarta al hacer click afuera: la selección se pierde igual.
-17. **Las herramientas (`/herramientas/*`) son páginas cliente puras** — sin
+17. **Los cobros son proveedor-agnósticos** — `lib/billing/provider.ts` define
+    el contrato (`createCheckout` + `parseWebhook` con verificación de firma) y
+    `PAYMENT_PROVIDER` elige el adaptador. Hoy los tres (visanet, vanapay,
+    paggo) están vacíos y `checkoutEnabled()` es falso, así que la app ofrece
+    activación manual. El tier lo otorga SIEMPRE el webhook, nunca el regreso
+    del usuario. Detalle en `docs/BILLING.md`.
+18. **Las herramientas (`/herramientas/*`) son páginas cliente puras** — sin
     DB, sin tier, sin API: el cálculo vive en `lib/modules/herramientas/*`
     (módulos sin `server-only`, con tests de Vitest) y la página solo lo
     dibuja. Alta en `lib/tools.ts`, que alimenta el menú y el índice.
@@ -208,7 +225,14 @@ app/
     arancel/                     → honorarios mínimos del Decreto 111-96
     area/                        → área de polígono por coordenadas o por
                                     rumbos y distancias + unidades agrarias
+  cuenta/                        → "Mi cuenta": plan, pagos, facturas,
+                                    historial y cerrar sesión
+    page.tsx, AccountClient.tsx, actions.ts (startCheckout)
+  api/webhooks/[provider]/route.ts → webhook de pagos (ÚNICO uso de la
+                                    service-role key)
   auth/actions.ts (signOut), login/page.tsx, register/page.tsx
+  auth/callback/route.ts         → canjea el ?code= de Google / confirmación
+                                    de correo por sesión
   admin/
     layout.tsx (guard), page.tsx, TierForm.tsx
     actions.ts                   → findArticle, createReformDraft,
@@ -226,11 +250,17 @@ components/
   ReaderSurface.tsx   → UNA superficie cliente por ley: selección de texto,
                          tooltip de highlight/nota, "guardar en caso"
   ToolsMenu.tsx       → dropdown "Herramientas" en la barra superior
+  UserMenu.tsx        → menú de la cuenta, por CLICK (el hover se cerraba solo)
+  GoogleButton.tsx    → "Continuar con Google"
   LawCard.tsx, ReformModal.tsx, PaywallModal.tsx, icons.tsx
 
 lib/
   supabase.ts / supabase-server.ts / supabase-bearer.ts / supabase-public.ts
                       → las cuatro factories (ver decisión 1)
+  supabase-service.ts → service-role, SOLO el webhook de pagos
+  billing/            → types.ts, provider.ts (contrato + registro),
+                         providers/{visanet,vanapay,paggo}.ts (vacíos),
+                         fel.ts (Infile, vacío)
   anchors.ts          → articleAnchor / sectionAnchor (ids del documento)
   cache/law-content.ts → contenido de ley cacheado (unstable_cache + tags)
   authz.ts            → Actor, getActor, requireUser/requirePro/requireAdmin
@@ -240,8 +270,10 @@ lib/
   case-colors.ts, section-kind.ts, types.ts
   api/handler.ts      → apiHandler (auth → rate limit → zod → servicio → JSON)
   api/rate-limit.ts   → searchLimiter / apiLimiter (Upstash, fail-open)
-  services/           → annotations.ts, cases.ts, reforms.ts, admin.ts (+tests)
-  services/queries/   → laws.ts, reading.ts, search.ts, cases.ts (+tests)
+  services/           → annotations.ts, cases.ts, reforms.ts, admin.ts,
+                         billing.ts (+tests)
+  services/queries/   → laws.ts, reading.ts, search.ts, cases.ts, billing.ts
+                         (+tests)
   tools.ts            → catálogo de herramientas (menú + índice)
   revision.ts         → `GAZETTE_REVIEWED_ON`: fecha de la última revisión del
                          Diario de Centro América. **Se actualiza a mano cada
@@ -256,7 +288,8 @@ lib/
 middleware.ts         → refresca la cookie de sesión; protege /admin/*
 
 supabase/
-  migrations/0001…0020_*.sql    → 0001-0019 aplicadas a prod; 0020 pendiente
+  migrations/0001…0021_*.sql    → 0001-0019 y 0021 aplicadas a prod;
+                                  0020 pendiente (datos legacy)
   seed.sql, seeds/{codigo_trabajo,test_reform}.sql
   tests/database/rls.test.sql   → pgTAP, 15 asserts (E1/E2/E3 + aislamiento)
   SCHEMA_SNAPSHOT.md            → schema vigente de prod
@@ -274,7 +307,9 @@ colecciones · `0009` reconciliación de schema · `0010` admin en
 `0015` `validate_law()` · `0016` dedupe de párrafos + UNIQUE · `0017`
 `validate_law` tolera derogados · `0018` grants de tabla · `0019`
 reconciliación del schema del extractor · `0020` posición única de secciones
-hermanas (pendiente).
+hermanas (pendiente) · `0021` cobros: `plans`, `payments`, `invoices`,
+`tier_events`, `apply_tier()`, `record_payment()`, `admin_list_users()`
+(**aplicada a prod el 2026-09-01**).
 
 ---
 
@@ -288,12 +323,55 @@ hermanas (pendiente).
 | `docs/SECURITY.md` | Matriz RLS tabla × operación × política |
 | `docs/API.md` | API v1 para mobile |
 | `docs/MODULES.md` | Convención de módulos Pro |
+| `docs/BILLING.md` | Cobros, tiers, FEL y el panel del operador |
 | `docs/CONTENT.md` | Checklist de 121 leyes + estado de calidad de datos |
 | `supabase/SCHEMA_SNAPSHOT.md` | Schema de producción |
 
 ---
 
-## Última sesión (2026-08-31, parte 5)
+## Última sesión (2026-09-01)
+
+**Cobros, tiers, Google auth y el panel del operador.**
+
+- **Migración `0021`, aplicada a prod**: `plans`, `payments`, `invoices`,
+  `tier_events` + `apply_tier()`, `record_payment()`, `admin_list_users()`.
+  El trigger de tier ahora deja escribir también al service role y a una
+  conexión directa como `postgres` (el panel del extractor), nunca a la anon
+  key. Verificado contra producción con la anon key: planes públicos sí; leer
+  pagos ajenos, insertar un pago y llamar `apply_tier` → vacío, 401 y "Not
+  authorized".
+- **Cobros proveedor-agnósticos** (`lib/billing/`): contrato `PaymentProvider`
+  + adaptadores **vacíos** de visanet, vanapay y paggo, y certificador FEL
+  (Infile) igual. `PAYMENT_PROVIDER` elige; sin proveedor la app ofrece
+  activación manual. El tier lo otorga el **webhook**
+  (`app/api/webhooks/[provider]`), único lugar con service-role key, tras
+  verificar firma y comparar el monto con el precio del plan.
+- **`/cuenta`**: plan vigente, vencimiento, planes, pagos, facturas, historial
+  y cerrar sesión. LexGT no guarda datos de tarjeta — el cobro ocurre en el
+  checkout alojado del proveedor.
+- **Google auth**: `components/GoogleButton.tsx` en login y registro, y
+  `app/auth/callback/route.ts` (que además cierra el pendiente #3 de la
+  confirmación por correo). Falta pegar Client ID/Secret en el dashboard de
+  Supabase — no se puede hacer desde el código.
+- **Menú de la cuenta arreglado**: era `group-hover`, así que se cerraba al
+  mover el ratón hacia "Cerrar sesión". Ahora es por click, con Escape y click
+  afuera. Verificado en navegador.
+- **Panel del operador en lex-extractor** (botón "Usuarios y pagos"):
+  estadísticas, tabla de usuarios con tier y vencimiento, filtros, pagos
+  recientes y el modal para cambiar plan (+meses, fecha exacta, vitalicio).
+  Todo pasa por `apply_tier`. Probado contra la base real, incluida una
+  prueba de humo de `record_payment` dentro de una transacción que se revierte.
+- Verificado: `tsc`, `lint`, 157 unit tests (11 nuevos de cobros), `build`.
+- **Sin verificar**: los 6 asserts pgTAP nuevos (no hay Docker en esta
+  máquina) y el flujo real de pago (no hay proveedor contratado).
+
+Siguiente sesión: ejecutar `docs/DEPLOY.md` (deploy a Vercel), configurar
+Google en el dashboard de Supabase y, después, la recarga por ley del
+contenido desde `lex-extractor`.
+
+---
+
+## Sesión previa (2026-08-31, parte 5)
 
 **Resaltado de varios párrafos a la vez.**
 
@@ -320,8 +398,6 @@ hermanas (pendiente).
   prueba (`tests/e2e/smoke.spec.ts`, grupo autenticado).
 - `tsc`, `lint`, 146 unit tests, `build` y 8/8 e2e anónimos en verde.
 
-Siguiente sesión: ejecutar `docs/DEPLOY.md` (deploy a Vercel) y, después, la
-recarga por ley del contenido desde `lex-extractor`.
 
 ---
 

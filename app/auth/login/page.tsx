@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import GoogleButton from '@/components/GoogleButton'
 
 export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
@@ -43,6 +44,15 @@ export default function LoginPage() {
             Regístrate
           </Link>
         </p>
+
+
+        <GoogleButton />
+
+        <div className="my-6 flex items-center gap-3">
+          <span className="h-px flex-1 bg-rule" />
+          <span className="text-[11px] uppercase tracking-widest text-ink-500">o con tu correo</span>
+          <span className="h-px flex-1 bg-rule" />
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>

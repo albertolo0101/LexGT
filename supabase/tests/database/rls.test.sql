@@ -5,13 +5,15 @@
 --   E2: tier fields on user_profiles cannot be self-updated
 --   E3: tier-gated writes (annotation color/note, cases) are enforced by RLS,
 --       not just Server Actions
--- Plus cross-user read isolation on the owner-scoped tables.
+-- Plus cross-user read isolation on the owner-scoped tables, and the billing
+-- boundary added in 0021: payments and invoices are readable only by their
+-- owner and writable by nobody holding an anon/authenticated key.
 
 begin;
 
 create extension if not exists pgtap;
 
-select plan(15);
+select plan(21);
 
 -- ============================================================
 -- Fixtures
@@ -55,6 +57,16 @@ values ('aaaaaaaa-0000-0000-0000-000000000006', '55555555-5555-5555-5555-5555555
 
 insert into public.reform_notifications (id, user_id, reform_id)
 values ('aaaaaaaa-0000-0000-0000-000000000007', '55555555-5555-5555-5555-555555555555', 'aaaaaaaa-0000-0000-0000-000000000004');
+
+-- Billing fixtures (0021): a paid plan, one payment for "other" and one for
+-- the free user, plus an invoice on the other user's payment.
+insert into public.payments (id, user_id, plan_key, provider, provider_payment_id, amount_cents, status, paid_at)
+values
+  ('aaaaaaaa-0000-0000-0000-000000000008', '55555555-5555-5555-5555-555555555555', 'pro_6m', 'manual', 'test-other', 39000, 'paid', now()),
+  ('aaaaaaaa-0000-0000-0000-000000000009', '11111111-1111-1111-1111-111111111111', 'pro_1m', 'manual', 'test-free',   7500, 'paid', now());
+
+insert into public.invoices (id, payment_id, provider, status, serie, numero)
+values ('aaaaaaaa-0000-0000-0000-00000000000a', 'aaaaaaaa-0000-0000-0000-000000000008', 'infile', 'issued', 'A', '1');
 
 -- ============================================================
 -- E1 — admin role must come from app_metadata, not user_metadata
@@ -186,6 +198,53 @@ select is(
   0,
   'Cross-user: cannot read another user''s user_profiles'
 );
+
+-- ============================================================
+-- 0021 — billing boundary
+-- ============================================================
+
+set local role authenticated;
+set local request.jwt.claims to '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+
+select is(
+  (select count(*) from public.payments where user_id = '55555555-5555-5555-5555-555555555555')::int,
+  0,
+  'Billing: cannot read another user''s payments'
+);
+
+select is(
+  (select count(*) from public.payments where user_id = '11111111-1111-1111-1111-111111111111')::int,
+  1,
+  'Billing: can read own payments'
+);
+
+select is(
+  (select count(*) from public.invoices where payment_id = 'aaaaaaaa-0000-0000-0000-000000000008')::int,
+  0,
+  'Billing: cannot read an invoice of another user''s payment'
+);
+
+select throws_like(
+  $$ insert into public.payments (user_id, provider, amount_cents, status)
+     values ('11111111-1111-1111-1111-111111111111', 'fake', 1, 'paid') $$,
+  '%row-level security%',
+  'Billing: a user cannot insert their own payment'
+);
+
+select throws_like(
+  $$ select public.apply_tier('11111111-1111-1111-1111-111111111111', 'pro', 12) $$,
+  '%Not authorized%',
+  'Billing: apply_tier refuses a non-admin caller'
+);
+
+select is(
+  (select count(*) from public.plans where is_active)::int > 0,
+  true,
+  'Billing: active plans are publicly readable'
+);
+
+reset request.jwt.claims;
+reset role;
 
 select * from finish();
 

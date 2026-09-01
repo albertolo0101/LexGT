@@ -1,6 +1,6 @@
 import Link from 'next/link'
-import { signOut } from '@/app/auth/actions'
 import { Ico } from './icons'
+import UserMenu from './UserMenu'
 import ToolsMenu from './ToolsMenu'
 import type { EffectiveTier, SerializedUser } from './ShellClient'
 
@@ -21,8 +21,6 @@ export default function TopBar({
   onToggleSidebar: () => void
   sidebarOpen: boolean
 }) {
-  const initials = user?.email ? user.email.slice(0, 2).toUpperCase() : ''
-
   return (
     <header className="h-[62px] flex-shrink-0 bg-navy-900 text-white flex items-center gap-3 px-3 sm:px-5 z-30 relative">
       <button
@@ -100,24 +98,7 @@ export default function TopBar({
               )}
             </button>
 
-            <div className="relative group">
-              <button className="w-8 h-8 rounded-full bg-navy-700 border border-white/10 flex items-center justify-center text-xs font-semibold text-gold-200">
-                {initials}
-              </button>
-              <div className="absolute right-0 top-full mt-2 hidden group-hover:block bg-white text-ink-900 rounded-lg shadow-lg border border-rule py-1 min-w-[160px] z-50">
-                <p className="px-3 py-1.5 text-xs text-ink-500 truncate border-b border-rule">{user?.email}</p>
-                {tier === 'pro' && (
-                  <Link href="/casos" className="block px-3 py-1.5 text-sm hover:bg-paper-2 transition-colors">
-                    Mis casos
-                  </Link>
-                )}
-                <form action={signOut}>
-                  <button type="submit" className="w-full text-left px-3 py-1.5 text-sm hover:bg-paper-2 transition-colors">
-                    Cerrar sesión
-                  </button>
-                </form>
-              </div>
-            </div>
+            {user && <UserMenu user={user} tier={tier} />}
           </>
         )}
       </div>
