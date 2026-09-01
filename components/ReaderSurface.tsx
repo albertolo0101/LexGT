@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import type { Tier } from "@/lib/types";
 import type { ActionResult } from "@/lib/action-result";
-import { saveAnnotation, deleteAnnotation, updateAnnotationNote } from "@/app/leyes/actions";
+import { saveAnnotations, deleteAnnotation, updateAnnotationNote } from "@/app/leyes/actions";
 import { addAnnotationToCase } from "@/app/casos/actions";
 import { createClient } from "@/lib/supabase";
 import { HL_TOKENS, HL_MARK_CLASS, type HighlightColor } from "@/lib/case-colors";
@@ -27,17 +27,49 @@ function getCharOffset(container: HTMLElement, node: Node, nodeOffset: number): 
   return total;
 }
 
-type TooltipState =
-  | {
-      kind: "new";
-      x: number;
-      y: number;
-      start: number;
-      end: number;
-      paragraphId: string;
-      articleId: string;
-      text: string;
+// Rango dentro del párrafo a partir de offsets de caracteres — el inverso de
+// `getCharOffset`. Se calcula al momento de pintar, contra el DOM vigente, en
+// vez de guardar el Range de la selección: al envolver un tramo en <mark> el
+// DOM cambia y un Range viejo puede quedar inválido.
+function rangeFromOffsets(container: HTMLElement, start: number, end: number): Range | null {
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+  const range = document.createRange();
+  let offset = 0;
+  let started = false;
+  while (walker.nextNode()) {
+    const node = walker.currentNode;
+    const length = node.textContent?.length ?? 0;
+    if (!started && offset + length > start) {
+      range.setStart(node, start - offset);
+      started = true;
     }
+    if (started && offset + length >= end) {
+      range.setEnd(node, end - offset);
+      return range;
+    }
+    offset += length;
+  }
+  return null;
+}
+
+// Tramo de la selección dentro de UN párrafo. Una selección que cruza varios
+// párrafos produce un segmento por párrafo, y cada uno se guarda como su propia
+// anotación (el anclaje es por párrafo).
+type Segment = {
+  paragraphId: string;
+  articleId: string;
+  start: number;
+  end: number;
+  /** Texto completo del párrafo: de aquí salen quote, prefix y suffix. */
+  text: string;
+};
+
+// Igual que `MAX_ANNOTATIONS_PER_SAVE` en el servicio: un "seleccionar todo"
+// sobre el Código Civil no debe intentar insertar miles de filas.
+const MAX_SEGMENTS = 50;
+
+type TooltipState =
+  | { kind: "new"; x: number; y: number; segments: Segment[] }
   | { kind: "existing"; x: number; y: number; annotationId: string };
 
 type UserCase = { id: string; title: string; color: string };
@@ -71,7 +103,6 @@ export default function ReaderSurface({
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
-  const pendingRangeRef = useRef<Range | null>(null);
   const activeMarkRef = useRef<HTMLElement | null>(null);
 
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
@@ -121,39 +152,61 @@ export default function ReaderSurface({
     };
   }, [closeTooltip, tooltip?.kind]);
 
-  const handleMouseUp = useCallback(() => {
-    if (!isAuthenticated) return;
-    const sel = window.getSelection();
-    if (!sel || sel.isCollapsed || sel.rangeCount === 0) return;
+  const handleMouseUp = useCallback(
+    (e: React.MouseEvent) => {
+      if (!isAuthenticated) return;
+      const sel = window.getSelection();
+      if (!sel || sel.isCollapsed || sel.rangeCount === 0) return;
+      const root = rootRef.current;
+      if (!root) return;
 
-    const range = sel.getRangeAt(0);
-    const anchor =
-      range.startContainer.nodeType === Node.TEXT_NODE
-        ? range.startContainer.parentElement
-        : (range.startContainer as Element);
-    const paragraph = anchor?.closest<HTMLElement>("[data-paragraph-id]");
-    // Una selección que cruza párrafos no se puede anclar a un solo
-    // `paragraph_id`; se ignora en vez de guardar algo incorrecto.
-    if (!paragraph || !paragraph.contains(range.endContainer)) return;
+      const range = sel.getRangeAt(0);
+      // Todos los párrafos que toca la selección, en orden de documento.
+      const paragraphs = Array.from(
+        root.querySelectorAll<HTMLElement>("[data-paragraph-id]")
+      ).filter((p) => range.intersectsNode(p));
+      if (paragraphs.length === 0) return;
 
-    const start = getCharOffset(paragraph, range.startContainer, range.startOffset);
-    const end = getCharOffset(paragraph, range.endContainer, range.endOffset);
-    if (start >= end) return;
+      const segments: Segment[] = [];
+      for (const paragraph of paragraphs) {
+        const text = paragraph.textContent ?? "";
+        const startOffset = paragraph.contains(range.startContainer)
+          ? getCharOffset(paragraph, range.startContainer, range.startOffset)
+          : 0;
+        const endOffset = paragraph.contains(range.endContainer)
+          ? getCharOffset(paragraph, range.endContainer, range.endOffset)
+          : text.length;
+        // Un párrafo que la selección solo roza (empieza donde otro termina)
+        // no aporta texto: se descarta, igual que los tramos en blanco.
+        if (endOffset <= startOffset) continue;
+        if (text.slice(startOffset, endOffset).trim() === "") continue;
 
-    const rect = range.getBoundingClientRect();
-    pendingRangeRef.current = range.cloneRange();
-    setActionError(null);
-    setTooltip({
-      kind: "new",
-      x: rect.left + rect.width / 2,
-      y: rect.top - 4,
-      start,
-      end,
-      paragraphId: paragraph.dataset.paragraphId!,
-      articleId: paragraph.dataset.articleId!,
-      text: paragraph.textContent ?? "",
-    });
-  }, [isAuthenticated]);
+        segments.push({
+          paragraphId: paragraph.dataset.paragraphId!,
+          articleId: paragraph.dataset.articleId!,
+          start: startOffset,
+          end: endOffset,
+          text,
+        });
+      }
+      if (segments.length === 0) return;
+
+      setActionError(
+        segments.length > MAX_SEGMENTS
+          ? `La selección abarca ${segments.length} párrafos; el máximo por resaltado es ${MAX_SEGMENTS}.`
+          : null
+      );
+      // El panel se ancla al puntero: con una selección larga el inicio puede
+      // haber quedado fuera de la pantalla.
+      setTooltip({
+        kind: "new",
+        x: e.clientX,
+        y: e.clientY - 8,
+        segments: segments.slice(0, MAX_SEGMENTS),
+      });
+    },
+    [isAuthenticated]
+  );
 
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
@@ -172,22 +225,24 @@ export default function ReaderSurface({
     [isAuthenticated, localNotes, notesById]
   );
 
-  // Inserta el <mark> recién guardado sin volver a pedir la ley al servidor.
-  const paintMark = (annotationId: string, color: HighlightColor) => {
-    const range = pendingRangeRef.current;
-    if (!range) return;
+  // Inserta los <mark> recién guardados sin volver a pedir la ley al servidor.
+  const paintMark = (segment: Segment, annotationId: string, color: HighlightColor) => {
+    const paragraph = rootRef.current?.querySelector<HTMLElement>(
+      `[data-paragraph-id="${segment.paragraphId}"]`
+    );
+    const range = paragraph ? rangeFromOffsets(paragraph, segment.start, segment.end) : null;
+    if (!range) return false;
     try {
       const mark = document.createElement("mark");
       mark.className = HL_MARK_CLASS[color];
       mark.dataset.annotationId = annotationId;
       mark.appendChild(range.extractContents());
       range.insertNode(mark);
+      return true;
     } catch {
-      // Rango inválido (el DOM cambió): el servidor ya tiene la anotación, así
-      // que basta con re-renderizar para verla.
-      router.refresh();
-    } finally {
-      pendingRangeRef.current = null;
+      // El rango cruzaba elementos que no se pueden envolver: el servidor ya
+      // tiene la anotación, basta re-renderizar para verla.
+      return false;
     }
   };
 
@@ -203,30 +258,37 @@ export default function ReaderSurface({
 
   const handleSave = () => {
     if (!tooltip || tooltip.kind !== "new") return;
-    const { start, end, paragraphId, articleId, text } = tooltip;
+    const { segments } = tooltip;
     const color = selectedColor;
     setTooltip(null);
     window.getSelection()?.removeAllRanges();
     setActionError(null);
 
-    const quote = text.slice(start, end);
-    const prefix = text.slice(Math.max(0, start - ANCHOR_CONTEXT_LENGTH), start);
-    const suffix = text.slice(end, end + ANCHOR_CONTEXT_LENGTH);
-
-    startTransition(async () => {
-      const result = await saveAnnotation({
-        paragraph_id: paragraphId,
-        article_id: articleId,
+    const payload = segments.map((segment) => {
+      const { text, start, end } = segment;
+      return {
+        paragraph_id: segment.paragraphId,
+        article_id: segment.articleId,
         char_start: start,
         char_end: end,
-        quote,
-        prefix,
-        suffix,
+        quote: text.slice(start, end),
+        prefix: text.slice(Math.max(0, start - ANCHOR_CONTEXT_LENGTH), start),
+        suffix: text.slice(end, end + ANCHOR_CONTEXT_LENGTH),
         color,
-      });
+      };
+    });
+
+    startTransition(async () => {
+      const result = await saveAnnotations({ annotations: payload });
       handleActionResult(result);
-      if (result.ok) paintMark(result.data.id, color);
-      else pendingRangeRef.current = null;
+      if (!result.ok) return;
+      const painted = segments.map((segment, i) => {
+        const id = result.data.ids[i];
+        return id ? paintMark(segment, id, color) : false;
+      });
+      // Si algún tramo no se pudo pintar en el DOM, se re-renderiza la ley:
+      // la anotación ya existe en el servidor y debe verse.
+      if (painted.some((ok) => !ok)) router.refresh();
     });
   };
 
@@ -328,8 +390,15 @@ export default function ReaderSurface({
                   disabled={pending}
                   className="text-xs font-semibold text-navy-900 bg-gold-400 hover:bg-gold-500 disabled:opacity-50 transition-colors rounded-full px-3 py-1 whitespace-nowrap"
                 >
-                  {pending ? "…" : "Destacar"}
+                  {pending
+                    ? "…"
+                    : tooltip.segments.length > 1
+                      ? `Destacar ${tooltip.segments.length} párrafos`
+                      : "Destacar"}
                 </button>
+                {actionError && (
+                  <p className="max-w-[220px] text-[11px] leading-snug text-red-300">{actionError}</p>
+                )}
               </div>
             ) : (
               <div className="bg-navy-900 text-white rounded-lg shadow-xl p-2.5 flex flex-col gap-2 w-[260px]">

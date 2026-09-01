@@ -149,6 +149,38 @@ test.describe("authenticated free user", () => {
     await expect(highlighted).toBeVisible();
   });
 
+  test("un resaltado que cruza párrafos guarda un fragmento por párrafo", async ({ page }) => {
+    await page.goto("/leyes/ley-de-orden-publico");
+
+    const paragraphs = page.locator("[data-paragraph-id]");
+    await paragraphs.nth(0).evaluate((el) => el.scrollIntoView({ block: "start" }));
+    await page.evaluate(() => document.querySelector("main")?.scrollBy(0, -110));
+
+    // Arrastre real del ratón desde el primer párrafo hasta el tercero.
+    const first = (await paragraphs.nth(0).boundingBox())!;
+    const third = (await paragraphs.nth(2).boundingBox())!;
+    await page.mouse.move(first.x + 12, first.y + 8);
+    await page.mouse.down();
+    await page.mouse.move(third.x + third.width / 2, third.y + 8, { steps: 12 });
+    await page.mouse.up();
+
+    await page.getByRole("button", { name: /Destacar 3 párrafos/ }).click();
+
+    // Un <mark> por párrafo, cada uno con su propia anotación.
+    const marks = page.locator("mark[data-annotation-id]");
+    await expect(marks).toHaveCount(3);
+
+    await page.reload();
+    await expect(page.locator("mark[data-annotation-id]")).toHaveCount(3);
+
+    // Limpieza: borrar los tres resaltados deja la ley como estaba.
+    for (let i = 0; i < 3; i++) {
+      await page.locator("mark[data-annotation-id]").first().click();
+      await page.getByRole("button", { name: /Eliminar resaltado/ }).click();
+      await expect(page.locator("mark[data-annotation-id]")).toHaveCount(2 - i);
+    }
+  });
+
   test("free user opens the right panel and the notes tab shows the paywall", async ({ page }) => {
     await page.goto("/leyes/ley-de-orden-publico");
 

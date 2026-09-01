@@ -68,6 +68,88 @@ export async function saveAnnotation(
   return { id: (created as { id: string }).id };
 }
 
+/**
+ * Un resaltado que cruza varios párrafos se guarda como una anotación por
+ * párrafo: el modelo de anclaje (`paragraph_id` + offsets + quote/prefix/
+ * suffix) es por párrafo y no se rompe por esto. El tope existe para que una
+ * selección de "toda la ley" no inserte miles de filas de un jalón.
+ */
+export const MAX_ANNOTATIONS_PER_SAVE = 50;
+
+export const SaveAnnotationsInput = z.object({
+  annotations: z.array(SaveAnnotationInput).min(1).max(MAX_ANNOTATIONS_PER_SAVE),
+});
+export type SaveAnnotationsInput = z.infer<typeof SaveAnnotationsInput>;
+
+const segmentKey = (a: { paragraph_id: string; char_start: number; char_end: number }) =>
+  `${a.paragraph_id}:${a.char_start}:${a.char_end}`;
+
+export async function saveAnnotations(
+  db: SupabaseClient,
+  actor: Actor,
+  input: SaveAnnotationsInput
+): Promise<{ ids: string[] }> {
+  requireUser(actor);
+
+  const items = input.annotations;
+  if (items.some((a) => (a.color ?? "yellow") !== "yellow") && actor.tier !== "pro") {
+    throw new AuthzError("PRO_REQUIRED", "Pro plan required for colored highlights");
+  }
+  if (items.some((a) => a.note != null) && actor.tier !== "pro") {
+    throw new AuthzError("PRO_REQUIRED", "Esta función requiere el plan Pro.");
+  }
+
+  // Un solo viaje por los textos: el checksum se calcula en el servidor, nunca
+  // se confía en el que mande el cliente.
+  const paragraphIds = [...new Set(items.map((a) => a.paragraph_id))];
+  const { data: paragraphs, error: paragraphError } = await db
+    .from("paragraphs")
+    .select("id, text")
+    .in("id", paragraphIds);
+  if (paragraphError) throw paragraphError;
+
+  const textById = new Map(
+    ((paragraphs ?? []) as { id: string; text: string }[]).map((p) => [p.id, p.text])
+  );
+  if (textById.size !== paragraphIds.length) {
+    throw new ActionError("NOT_FOUND", "Paragraph not found");
+  }
+
+  const checksums = new Map<string, string>();
+  for (const [id, text] of textById) checksums.set(id, await textChecksum(text));
+
+  const rows = items.map((a) => ({
+    user_id: actor.userId,
+    paragraph_id: a.paragraph_id,
+    article_id: a.article_id,
+    char_start: a.char_start,
+    char_end: a.char_end,
+    color: a.color ?? "yellow",
+    note: a.note ?? null,
+    quote: a.quote,
+    prefix: a.prefix ?? null,
+    suffix: a.suffix ?? null,
+    text_checksum: checksums.get(a.paragraph_id)!,
+    anchor_status: "anchored",
+  }));
+
+  const { data: created, error } = await db
+    .from("annotations")
+    .insert(rows)
+    .select("id, paragraph_id, char_start, char_end");
+  if (error) throw error;
+
+  // El orden de `RETURNING` no está garantizado: cada id se devuelve en el
+  // orden de los segmentos que mandó el cliente, emparejado por su ancla.
+  const idByKey = new Map(
+    ((created ?? []) as { id: string; paragraph_id: string; char_start: number; char_end: number }[]).map(
+      (row) => [segmentKey(row), row.id]
+    )
+  );
+
+  return { ids: items.map((a) => idByKey.get(segmentKey(a)) ?? "") };
+}
+
 export const ReanchorAnnotationInput = z.object({
   id: z.string(),
   char_start: z.number().int().nonnegative(),

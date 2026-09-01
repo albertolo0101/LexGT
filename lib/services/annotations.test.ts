@@ -5,6 +5,8 @@ import { ActionError } from "@/lib/action-result";
 import { makeBuilder, makeDb } from "@/lib/test/mock-supabase";
 import {
   saveAnnotation,
+  saveAnnotations,
+  SaveAnnotationsInput,
   updateAnnotationNote,
   deleteAnnotation,
   migrateAnnotations,
@@ -17,6 +19,71 @@ const paragraphBuilder = () => makeBuilder({ data: { text: "hola mundo" }, error
 const anonymousActor: Actor = { userId: null, tier: "anonymous", isAdmin: false };
 const freeActor: Actor = { userId: "free-user", tier: "free", isAdmin: false };
 const proActor: Actor = { userId: "pro-user", tier: "pro", isAdmin: false };
+
+const segment = (paragraphId: string, start: number, end: number) => ({
+  paragraph_id: paragraphId,
+  article_id: "a1",
+  char_start: start,
+  char_end: end,
+  quote: "hola",
+});
+
+describe("saveAnnotations (selección de varios párrafos)", () => {
+  it("rejects non-yellow colors for free users", async () => {
+    const db = makeDb([]);
+    await expect(
+      saveAnnotations(db, freeActor, {
+        annotations: [{ ...segment("p1", 0, 4), color: "pink" }],
+      })
+    ).rejects.toMatchObject({ code: "PRO_REQUIRED" });
+  });
+
+  it("devuelve los ids en el orden de los segmentos, no en el del INSERT", async () => {
+    const paragraphs = makeBuilder({
+      data: [
+        { id: "p1", text: "hola mundo" },
+        { id: "p2", text: "segundo párrafo" },
+      ],
+      error: null,
+    });
+    // El RETURNING llega en otro orden a propósito.
+    const insert = makeBuilder({
+      data: [
+        { id: "ann2", paragraph_id: "p2", char_start: 0, char_end: 7 },
+        { id: "ann1", paragraph_id: "p1", char_start: 5, char_end: 10 },
+      ],
+      error: null,
+    });
+    const db = makeDb([paragraphs, insert]);
+
+    const result = await saveAnnotations(db, freeActor, {
+      annotations: [segment("p1", 5, 10), segment("p2", 0, 7)],
+    });
+
+    expect(result.ids).toEqual(["ann1", "ann2"]);
+  });
+
+  it("falla si alguno de los párrafos no existe", async () => {
+    const paragraphs = makeBuilder({ data: [{ id: "p1", text: "hola mundo" }], error: null });
+    const db = makeDb([paragraphs]);
+
+    await expect(
+      saveAnnotations(db, proActor, {
+        annotations: [segment("p1", 0, 4), segment("p-fantasma", 0, 4)],
+      })
+    ).rejects.toBeInstanceOf(ActionError);
+  });
+
+  it("no acepta más de 50 segmentos de un jalón", () => {
+    const many = Array.from({ length: 51 }, (_, i) => segment(`p${i}`, 0, 4));
+    expect(() => SaveAnnotationsInput.parse({ annotations: many })).toThrow();
+    expect(() => SaveAnnotationsInput.parse({ annotations: many.slice(0, 50) })).not.toThrow();
+  });
+
+  it("exige al menos un segmento", () => {
+    expect(() => SaveAnnotationsInput.parse({ annotations: [] })).toThrow();
+  });
+});
 
 describe("saveAnnotation", () => {
   it("rejects unauthenticated users", async () => {

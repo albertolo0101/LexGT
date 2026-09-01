@@ -27,6 +27,32 @@ export async function saveAnnotation(data: {
   });
 }
 
+/**
+ * Guarda un resaltado que cruza varios párrafos: un fragmento por párrafo, en
+ * una sola llamada. Devuelve los ids en el mismo orden de los segmentos para
+ * que el lector pinte cada `<mark>` sin re-renderizar la ley.
+ */
+export async function saveAnnotations(data: {
+  annotations: {
+    paragraph_id: string;
+    article_id: string;
+    char_start: number;
+    char_end: number;
+    quote: string;
+    prefix?: string | null;
+    suffix?: string | null;
+    color?: string;
+    note?: string | null;
+  }[];
+}): Promise<ActionResult<{ ids: string[] }>> {
+  return runAction(async () => {
+    const supabase = await createServerSupabaseClient();
+    const actor = await getActor(supabase);
+    const input = annotationsService.SaveAnnotationsInput.parse(data);
+    return annotationsService.saveAnnotations(supabase, actor, input);
+  });
+}
+
 export async function reanchorAnnotation(data: {
   id: string;
   char_start: number;

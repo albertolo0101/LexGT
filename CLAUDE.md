@@ -20,8 +20,8 @@ Tres tiers: **anónimo** (lectura + búsqueda, ventana de reformas 7 días),
 
 ## Estado (2026-08-31)
 
-- `npx tsc --noEmit`, `npm run lint`, `npm run test` (141), `npm run build`:
-  verdes. `npm run test:e2e`: 8/8 anónimos (2 autenticados en skip).
+- `npx tsc --noEmit`, `npm run lint`, `npm run test` (146), `npm run build`:
+  verdes. `npm run test:e2e`: 8/8 anónimos (3 autenticados en skip).
   `npm run test:rls` (pgTAP): 15/15 con Docker corriendo.
 - Plan de remediación arquitectónica **Phases 0-7 completo** — seguridad
   cerrada a nivel RLS, capa de servicios, API v1, anclaje de anotaciones v2,
@@ -117,12 +117,20 @@ Matriz completa en `docs/SECURITY.md`.
     `lib/cache/law-content.ts`; `getLawUserLayer` (highlights, notas,
     reformas) siempre se consulta fresco. Las acciones que cambian texto
     llaman `revalidateTag(LAW_CONTENT_TAG)`.
-15. **El panel de anotación es un formulario, no un tooltip** — se cierra solo
+15. **Un resaltado puede cruzar párrafos** — la selección se parte en un
+    segmento por párrafo y cada uno se guarda como su propia anotación
+    (`saveAnnotations`, tope de 50 por gesto): el anclaje es por
+    `paragraph_id` + offsets y no se toca. Consecuencia: borrar o anotar
+    afecta solo al fragmento del párrafo en el que se hizo clic. Los `<mark>`
+    se pintan reconstruyendo el rango desde los offsets contra el DOM vigente
+    (`rangeFromOffsets`), no guardando el `Range` de la selección, que queda
+    inválido al envolver el primer tramo.
+16. **El panel de anotación es un formulario, no un tooltip** — se cierra solo
     con "Guardar nota", "Eliminar", la X o Escape. Un click afuera ya no lo
     descarta (borraba la nota a medio escribir) y guardar en un caso lo deja
     abierto con la confirmación. El panel de una selección nueva sí se
     descarta al hacer click afuera: la selección se pierde igual.
-16. **Las herramientas (`/herramientas/*`) son páginas cliente puras** — sin
+17. **Las herramientas (`/herramientas/*`) son páginas cliente puras** — sin
     DB, sin tier, sin API: el cálculo vive en `lib/modules/herramientas/*`
     (módulos sin `server-only`, con tests de Vitest) y la página solo lo
     dibuja. Alta en `lib/tools.ts`, que alimenta el menú y el índice.
@@ -166,7 +174,8 @@ app/
   buscar/page.tsx                → resultados full-text
   leyes/
     page.tsx + LeyesIndexClient.tsx → catálogo (cuadrícula de "libros" + lista)
-    actions.ts                   → saveAnnotation, deleteAnnotation,
+    actions.ts                   → saveAnnotation, saveAnnotations (selección
+                                    multi-párrafo), deleteAnnotation,
                                     updateAnnotationNote, migrateAnnotations,
                                     markReformSeen, publishReform
     [slug]/                      → vista de lectura: la ley COMPLETA en scroll
@@ -284,7 +293,39 @@ hermanas (pendiente).
 
 ---
 
-## Última sesión (2026-08-31, parte 4)
+## Última sesión (2026-08-31, parte 5)
+
+**Resaltado de varios párrafos a la vez.**
+
+- Antes, una selección que cruzaba párrafos se descartaba en silencio. Ahora
+  `ReaderSurface` la parte en un segmento por párrafo (offsets propios de cada
+  uno) y los guarda de un jalón con `saveAnnotations`, acción y servicio
+  nuevos: una sola consulta por los textos, checksum por párrafo calculado en
+  el servidor y los ids devueltos **en el orden de los segmentos**, emparejados
+  por su ancla (el `RETURNING` de Postgres no garantiza orden).
+- Tope de 50 párrafos por gesto (`MAX_ANNOTATIONS_PER_SAVE`), con aviso en
+  pantalla: un "seleccionar todo" sobre el Código Civil no debe insertar miles
+  de filas.
+- Los `<mark>` se pintan reconstruyendo el rango desde los offsets contra el
+  DOM vigente; si alguno no se puede envolver, se cae a `router.refresh()`.
+  El panel de la selección se ancla al puntero (con una selección larga el
+  inicio suele quedar fuera de la pantalla).
+- Verificado en un navegador real (parche temporal de sesión, ya revertido):
+  arrastrar sobre tres párrafos muestra "Destacar 3 párrafos" y pinta tres
+  `<mark>`, uno por párrafo, con texto idéntico byte a byte al seleccionado y
+  sin alterar el `textContent` del párrafo (contrato de anclaje). Cruza sin
+  problema el límite entre artículos y los encabezados de sección.
+- **Sin verificar (requiere sesión Pro):** el guardado real contra la base. El
+  e2e que lo cubre ya está escrito y corre en cuanto exista la cuenta de
+  prueba (`tests/e2e/smoke.spec.ts`, grupo autenticado).
+- `tsc`, `lint`, 146 unit tests, `build` y 8/8 e2e anónimos en verde.
+
+Siguiente sesión: ejecutar `docs/DEPLOY.md` (deploy a Vercel) y, después, la
+recarga por ley del contenido desde `lex-extractor`.
+
+---
+
+## Sesión previa (2026-08-31, parte 4)
 
 **Cinco herramientas y el LED de vigencia global.**
 
@@ -320,8 +361,6 @@ hermanas (pendiente).
 - Verificado: `tsc`, `lint`, 141 unit tests, `build` y 8/8 e2e anónimos contra
   el build de producción (tres nuevos: plazos, timbres y arancel).
 
-Siguiente sesión: ejecutar `docs/DEPLOY.md` (deploy a Vercel) y, después, la
-recarga por ley del contenido desde `lex-extractor`.
 
 ---
 
