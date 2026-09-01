@@ -39,7 +39,7 @@ export default function ResultsClient({ results, cases, savedIds }: Props) {
   if (results.length === 0) {
     return (
       <div className="py-12 text-center">
-        <p className="text-sm text-ink-600">No se encontró ninguna resolución.</p>
+        <p className="text-sm text-ink-700">No se encontró ninguna resolución.</p>
         <p className="mt-1 text-xs text-ink-500">
           Prueba con menos filtros o un término más general.
         </p>
@@ -138,13 +138,13 @@ function ResultCard({ item, cases, isSaved, refId, onSaved, isOpen, onToggle }: 
         {item.pagina && `, pág. ${item.pagina}`}
       </p>
 
-      <p className="mt-2 text-[13px] leading-relaxed text-ink-800">{item.sumario}</p>
+      <p className="mt-2 text-[13px] leading-relaxed text-ink-900">{item.sumario}</p>
 
       <div className="mt-3 flex flex-wrap items-center gap-4 border-t border-rule pt-3 text-xs">
         <button
           type="button"
           onClick={onToggle}
-          className="inline-flex items-center gap-1 text-ink-600 transition-colors hover:text-navy-800"
+          className="inline-flex items-center gap-1 text-ink-700 transition-colors hover:text-navy-800"
         >
           <Ico.bookmark className="h-3.5 w-3.5" />
           {isSaved ? 'Añadir a un caso' : 'Guardar'}
@@ -153,7 +153,7 @@ function ResultCard({ item, cases, isSaved, refId, onSaved, isOpen, onToggle }: 
           href={CC_PORTAL_EXPEDIENTE_URL}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-ink-600 transition-colors hover:text-navy-800"
+          className="inline-flex items-center gap-1 text-ink-700 transition-colors hover:text-navy-800"
           title="El portal de la CC no acepta enlaces directos: busca ahí el expediente para leer el texto íntegro."
         >
           <Ico.link className="h-3.5 w-3.5" /> Texto íntegro en la CC
@@ -163,7 +163,7 @@ function ResultCard({ item, cases, isSaved, refId, onSaved, isOpen, onToggle }: 
             href={item.source_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-ink-600 transition-colors hover:text-navy-800"
+            className="inline-flex items-center gap-1 text-ink-700 transition-colors hover:text-navy-800"
           >
             <Ico.scroll className="h-3.5 w-3.5" /> Gaceta {item.gaceta} (PDF)
           </a>
@@ -198,7 +198,7 @@ function ResultCard({ item, cases, isSaved, refId, onSaved, isOpen, onToggle }: 
                   if (e.target.value) save(e.target.value)
                   e.target.value = ''
                 }}
-                className="rounded-md border border-rule bg-white px-2 py-1.5 text-xs text-ink-800 focus:border-navy-800 focus:outline-none"
+                className="rounded-md border border-rule bg-white px-2 py-1.5 text-xs text-ink-900 focus:border-navy-800 focus:outline-none"
               >
                 <option value="">Guardar en un caso…</option>
                 {cases.map((c) => (
@@ -210,7 +210,7 @@ function ResultCard({ item, cases, isSaved, refId, onSaved, isOpen, onToggle }: 
             )}
           </div>
 
-          {status && <p className="text-[11px] text-ink-600">{status}</p>}
+          {status && <p className="text-[11px] text-ink-700">{status}</p>}
           {isSaved && refId === '' && (
             <p className="text-[11px] text-ink-500">
               Ya la tenías guardada; elige un caso para adjuntarla.

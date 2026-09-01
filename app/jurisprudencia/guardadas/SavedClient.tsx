@@ -32,7 +32,7 @@ export default function SavedClient({ refs, cases }: Props) {
   if (refs.length === 0) {
     return (
       <div className="rounded-lg border border-dashed border-rule bg-white py-16 text-center">
-        <p className="text-sm text-ink-600">Aquí aparecerán las resoluciones que guardes.</p>
+        <p className="text-sm text-ink-700">Aquí aparecerán las resoluciones que guardes.</p>
         <Link
           href="/jurisprudencia"
           className="mt-3 inline-block text-xs text-navy-800 underline underline-offset-2"
@@ -148,7 +148,7 @@ function SavedCard({ item, cases }: { item: JurisprudenciaRefWithSource; cases: 
               if (e.target.value) attach(e.target.value)
               e.target.value = ''
             }}
-            className="rounded-md border border-rule bg-white px-2 py-1.5 text-xs text-ink-800 focus:border-navy-800 focus:outline-none"
+            className="rounded-md border border-rule bg-white px-2 py-1.5 text-xs text-ink-900 focus:border-navy-800 focus:outline-none"
           >
             <option value="">Añadir a un caso…</option>
             {cases.map((c) => (
@@ -163,12 +163,12 @@ function SavedCard({ item, cases }: { item: JurisprudenciaRefWithSource; cases: 
           href={item.url ?? CC_PORTAL_EXPEDIENTE_URL}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-ink-600 transition-colors hover:text-navy-800"
+          className="inline-flex items-center gap-1 text-ink-700 transition-colors hover:text-navy-800"
         >
           <Ico.link className="h-3.5 w-3.5" /> Ver en la CC
         </a>
 
-        {status && <span className="text-[11px] text-ink-600">{status}</span>}
+        {status && <span className="text-[11px] text-ink-700">{status}</span>}
       </div>
     </li>
   )

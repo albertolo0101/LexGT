@@ -33,6 +33,91 @@ type Props = {
 const inputClass =
   'w-full rounded-md border border-rule bg-white px-3 py-2 text-sm text-ink-900 placeholder:text-ink-400 focus:border-navy-800 focus:outline-none'
 
+/** Ventana de números alrededor de la página actual, con los extremos siempre. */
+function pageWindow(current: number, total: number): (number | 'gap')[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
+  const around = new Set<number>([1, total, current])
+  for (let d = 1; d <= 2; d++) {
+    if (current - d > 1) around.add(current - d)
+    if (current + d < total) around.add(current + d)
+  }
+  const sorted = [...around].sort((a, b) => a - b)
+  const out: (number | 'gap')[] = []
+  for (let i = 0; i < sorted.length; i++) {
+    if (i > 0 && sorted[i] - sorted[i - 1] > 1) out.push('gap')
+    out.push(sorted[i])
+  }
+  return out
+}
+
+function Pager({
+  page,
+  totalPages,
+  href,
+  compact = false,
+}: {
+  page: number
+  totalPages: number
+  href: (n: number) => string
+  compact?: boolean
+}) {
+  if (totalPages <= 1) return null
+
+  const step =
+    'rounded-md border border-rule bg-white px-2.5 py-1.5 text-ink-900 transition-colors hover:border-navy-800 hover:text-navy-800'
+  const disabled = 'rounded-md border border-rule px-2.5 py-1.5 text-ink-400'
+
+  return (
+    <nav
+      aria-label="Paginación"
+      className={`flex flex-wrap items-center gap-1.5 text-xs ${compact ? '' : 'justify-center'}`}
+    >
+      {page > 1 ? (
+        <Link href={href(page - 1)} className={step} rel="prev">
+          ← Anterior
+        </Link>
+      ) : (
+        <span className={disabled}>← Anterior</span>
+      )}
+
+      {!compact &&
+        pageWindow(page, totalPages).map((n, i) =>
+          n === 'gap' ? (
+            <span key={`gap-${i}`} className="px-1 text-ink-400">
+              …
+            </span>
+          ) : n === page ? (
+            <span
+              key={n}
+              aria-current="page"
+              className="rounded-md bg-navy-900 px-2.5 py-1.5 font-semibold text-white"
+            >
+              {n}
+            </span>
+          ) : (
+            <Link key={n} href={href(n)} className={step}>
+              {n}
+            </Link>
+          )
+        )}
+
+      {compact && (
+        <span className="px-1 text-ink-700">
+          Página {page} de {totalPages}
+        </span>
+      )}
+
+      {page < totalPages ? (
+        <Link href={href(page + 1)} className={step} rel="next">
+          Siguiente →
+        </Link>
+      ) : (
+        <span className={disabled}>Siguiente →</span>
+      )}
+    </nav>
+  )
+}
+
 export default async function JurisprudenciaPage({ searchParams }: Props) {
   const params = await searchParams
   const supabase = await createServerSupabaseClient()
@@ -74,7 +159,7 @@ export default async function JurisprudenciaPage({ searchParams }: Props) {
 
   const hasCriteria = Boolean(q || exp || tipo || resultado || desde || hasta)
 
-  const [facets, cases, savedIds, search] = await Promise.all([
+  const [facets, cases, savedIds, first] = await Promise.all([
     getJurisprudenciaFacets(supabase),
     listCases(supabase, actor),
     getSavedJurisprudenciaIds(supabase, actor.userId),
@@ -92,7 +177,24 @@ export default async function JurisprudenciaPage({ searchParams }: Props) {
       : Promise.resolve({ results: [], total: 0 }),
   ])
 
-  const totalPages = Math.max(1, Math.ceil(search.total / PAGE_SIZE))
+  // Si `p` se pasó del final (URL editada a mano, o una búsqueda que se
+  // acortó), se sirve la última página real en vez de una lista vacía.
+  const totalPages = Math.max(1, Math.ceil(first.total / PAGE_SIZE))
+  const safePage = Math.min(page, totalPages)
+  const search =
+    safePage === page
+      ? first
+      : await searchJurisprudencia(supabase, {
+          q,
+          expediente: exp || null,
+          tipoProceso: tipo || null,
+          resultado: resultado || null,
+          desde: desde || null,
+          hasta: hasta || null,
+          limit: PAGE_SIZE,
+          offset: (safePage - 1) * PAGE_SIZE,
+        })
+
   const pageHref = (n: number) => {
     const next = new URLSearchParams()
     if (q) next.set('q', q)
@@ -130,7 +232,6 @@ export default async function JurisprudenciaPage({ searchParams }: Props) {
             defaultValue={q}
             placeholder="Texto libre: debido proceso, derecho de defensa…"
             className={inputClass}
-            autoFocus
           />
 
           <div className="grid gap-3 sm:grid-cols-2">
@@ -200,32 +301,21 @@ export default async function JurisprudenciaPage({ searchParams }: Props) {
           </p>
         ) : (
           <>
-            <p className="mb-4 text-xs text-ink-500">
-              {search.total > 0
-                ? `${search.total.toLocaleString('es-GT')} resolución${search.total === 1 ? '' : 'es'}`
-                : 'Sin resultados'}
-              {search.total > PAGE_SIZE && ` · página ${page} de ${totalPages}`}
-            </p>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <p className="text-xs text-ink-700">
+                {search.total > 0
+                  ? `${search.total.toLocaleString('es-GT')} resolución${search.total === 1 ? '' : 'es'}`
+                  : 'Sin resultados'}
+              </p>
+              <Pager page={safePage} totalPages={totalPages} href={pageHref} compact />
+            </div>
 
             <ResultsClient results={search.results} cases={cases} savedIds={[...savedIds]} />
 
             {totalPages > 1 && (
-              <nav className="mt-8 flex items-center justify-between border-t border-rule pt-4 text-xs">
-                {page > 1 ? (
-                  <Link href={pageHref(page - 1)} className="text-ink-600 hover:text-navy-800">
-                    ← Anterior
-                  </Link>
-                ) : (
-                  <span />
-                )}
-                {page < totalPages ? (
-                  <Link href={pageHref(page + 1)} className="text-ink-600 hover:text-navy-800">
-                    Siguiente →
-                  </Link>
-                ) : (
-                  <span />
-                )}
-              </nav>
+              <div className="mt-8 border-t border-rule pt-5">
+                <Pager page={safePage} totalPages={totalPages} href={pageHref} />
+              </div>
             )}
           </>
         )}

@@ -38,10 +38,17 @@ export async function searchJurisprudencia(
   const { q, expediente, tipoProceso, resultado, desde, hasta, limit } = input
   const offset = input.offset ?? 0
 
+  // El segundo `order` no es decorativo. Hay 23,882 resoluciones repartidas en
+  // 1,393 fechas — 17 por día de media, hasta 71 en un solo día — así que
+  // ordenar solo por fecha NO es un orden total: casi todo corte de página cae
+  // dentro de un grupo de filas empatadas, y sin desempate Postgres puede
+  // devolverlas en distinto orden en cada consulta, repitiendo filas en la
+  // página 2 y saltándose otras. `id` es único, así que fija el orden.
   let query = db
     .from('jurisprudencia')
     .select(COLUMNS, { count: 'exact' })
     .order('fecha_sentencia', { ascending: false })
+    .order('id', { ascending: true })
     .range(offset, offset + limit - 1)
 
   const text = q.trim()

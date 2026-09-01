@@ -3,8 +3,10 @@ import { getActor } from "@/lib/authz";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getCaseDetail } from "@/lib/services/queries/cases";
+import { getCaseJurisprudencia } from "@/lib/services/queries/jurisprudencia";
 import { deleteCase } from "../actions";
 import CaseDetailClient from "./CaseDetailClient";
+import CaseJurisprudencia from "./CaseJurisprudencia";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -17,6 +19,8 @@ export default async function CaseDetailPage({ params }: Props) {
 
   const theCase = await getCaseDetail(supabase, actor, id).catch(() => null);
   if (!theCase) notFound();
+
+  const jurisprudencia = await getCaseJurisprudencia(supabase, id);
 
   const caseId = theCase.id;
 
@@ -56,6 +60,8 @@ export default async function CaseDetailPage({ params }: Props) {
           notes={theCase.description}
           annotations={theCase.annotations}
         />
+
+        <CaseJurisprudencia rows={jurisprudencia} />
       </main>
     </div>
   );
