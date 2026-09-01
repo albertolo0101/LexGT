@@ -32,6 +32,8 @@ export type CaseDetailAnnotation = {
   note: string | null;
   excerpt: string | null;
   article: { number: string; heading: string | null } | null;
+  /** Ley del artículo, para saltar de la ficha del caso al texto vigente. */
+  law: { slug: string; short_name: string } | null;
 };
 
 export type CaseDetail = Case & { annotations: CaseDetailAnnotation[] };
@@ -47,7 +49,13 @@ type CaseDetailRow = Case & {
           char_start: number;
           char_end: number;
           paragraphs: { text: string } | null;
-          articles: { number: string; heading: string | null } | null;
+          articles:
+            | {
+                number: string;
+                heading: string | null;
+                laws: { slug: string; short_name: string } | null;
+              }
+            | null;
         } | null;
       }[]
     | null;
@@ -65,7 +73,7 @@ export async function getCaseDetail(db: SupabaseClient, actor: Actor, caseId: st
         annotations(
           id, color, note, char_start, char_end,
           paragraphs(text),
-          articles(number, heading)
+          articles(number, heading, laws(slug, short_name))
         )
       )
     `)
@@ -88,7 +96,8 @@ export async function getCaseDetail(db: SupabaseClient, actor: Actor, caseId: st
         color: ann.color,
         note: ann.note,
         excerpt,
-        article: ann.articles,
+        article: ann.articles ? { number: ann.articles.number, heading: ann.articles.heading } : null,
+        law: ann.articles?.laws ?? null,
       };
     });
 

@@ -1,25 +1,19 @@
 import { createServerSupabaseClient } from "@/lib/supabase-server";
-import { getUserTier } from "@/lib/get-user-tier";
+import { getActor } from "@/lib/authz";
 import Link from "next/link";
-import type { Case } from "@/lib/types";
+import { listCases } from "@/lib/services/queries/cases";
 import CasesClient from "./CasesClient";
-
-type CaseWithCount = Case & { case_annotations: { id: string }[] };
 
 export default async function CasosPage() {
   const supabase = await createServerSupabaseClient();
+  const actor = await getActor(supabase);
 
-  const [{ data: { user } }, tier] = await Promise.all([
-    supabase.auth.getUser(),
-    getUserTier(supabase),
-  ]);
-
-  if (!user || tier !== "pro") {
+  if (!actor.userId || actor.tier !== "pro") {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-center space-y-3">
-          <p className="text-sm text-gray-500">Esta función es exclusiva del tier Pro.</p>
-          <Link href="/leyes" className="text-xs text-gray-400 hover:text-gray-700 transition-colors">
+      <div className="flex min-h-full items-center justify-center bg-paper-2">
+        <div className="space-y-3 text-center">
+          <p className="text-sm text-ink-700">Esta función es exclusiva del tier Pro.</p>
+          <Link href="/leyes" className="text-xs text-ink-500 transition-colors hover:text-navy-800">
             ← Volver a leyes
           </Link>
         </div>
@@ -27,19 +21,13 @@ export default async function CasosPage() {
     );
   }
 
-  const { data: casesRaw } = await supabase
-    .from("cases")
-    .select("id, user_id, title, description, color, created_at, updated_at, case_annotations(id)")
-    .eq("user_id", user.id)
-    .order("updated_at", { ascending: false });
-
-  const cases = (casesRaw ?? []) as CaseWithCount[];
+  const cases = await listCases(supabase, actor);
 
   return (
-    <div className="min-h-screen bg-white">
-      <main className="max-w-2xl mx-auto px-6 py-12">
-        <div className="flex items-center justify-between mb-10">
-          <h1 className="text-xl font-semibold text-gray-900">Mis casos</h1>
+    <div className="min-h-full bg-paper-2">
+      <main className="mx-auto max-w-2xl px-6 py-12">
+        <div className="mb-8 flex items-center justify-between">
+          <h1 className="font-serif text-2xl text-ink-900">Mis casos</h1>
         </div>
         <CasesClient cases={cases} />
       </main>

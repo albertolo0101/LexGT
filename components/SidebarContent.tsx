@@ -130,7 +130,7 @@ export default function SidebarContent({
         {tier === 'pro' ? (
           <>
             {cases.length === 0 ? (
-              <p className="px-4 py-1.5 text-xs text-ink-400">Sin casos todavía.</p>
+              <p className="px-4 py-1.5 text-xs text-ink-700">Sin casos todavía.</p>
             ) : (
               <ul>
                 {cases.slice(0, 4).map((c) => {
@@ -154,7 +154,7 @@ export default function SidebarContent({
             <Link
               href="/casos"
               onClick={onNavigate}
-              className="block px-4 py-1.5 text-xs text-navy-600 hover:text-navy-800 transition-colors"
+              className="block px-4 py-1.5 text-xs font-medium text-navy-800 hover:text-navy-900 transition-colors"
             >
               {cases.length > 4 ? `Ver todos los casos (${cases.length}) →` : 'Ver todos los casos →'}
             </Link>
@@ -163,7 +163,7 @@ export default function SidebarContent({
           <Link
             href="/auth/login"
             onClick={onNavigate}
-            className="mx-4 block rounded-lg border border-dashed border-rule bg-paper-2 px-3 py-2.5 text-left text-xs text-ink-500 hover:border-navy-200 transition-colors"
+            className="mx-4 block rounded-lg border border-dashed border-rule bg-paper-2 px-3 py-2.5 text-left text-xs text-ink-900 hover:border-navy-200 transition-colors"
           >
             Inicia sesión para ver tus casos
           </Link>

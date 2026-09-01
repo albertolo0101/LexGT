@@ -24,6 +24,24 @@ export async function createCase(data: {
   });
 }
 
+export async function updateCase(data: {
+  caseId: string;
+  title?: string;
+  description?: string | null;
+  color?: string;
+}): Promise<ActionResult<Case>> {
+  return runAction(async () => {
+    const supabase = await createServerSupabaseClient();
+    const actor = await getActor(supabase);
+    const input = casesService.UpdateCaseInput.parse(data);
+    const updated = await casesService.updateCase(supabase, actor, input);
+
+    revalidatePath("/casos");
+    revalidatePath(`/casos/${input.caseId}`);
+    return updated;
+  });
+}
+
 export async function deleteCase(caseId: string): Promise<ActionResult<void>> {
   const result = await runAction(async () => {
     const supabase = await createServerSupabaseClient();

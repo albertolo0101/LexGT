@@ -13,10 +13,10 @@ detalle de cómo se ejecutó cada fase vive en el historial de git; aquí queda
 
 ## Estado en una línea
 
-La app compila, 67 unit tests y 15 tests pgTAP de RLS en verde, la seguridad
-está cerrada a nivel de base de datos y hay 16 leyes cargadas. **Falta
-publicarla** (prueba en Vercel: [DEPLOY.md](DEPLOY.md)) y **cerrar la calidad
-del contenido** antes de abrirla al público.
+La app compila, 96 unit tests, 5 e2e anónimos y 15 tests pgTAP de RLS en
+verde, la seguridad está cerrada a nivel de base de datos y hay 16 leyes
+cargadas. **Falta publicarla** (prueba en Vercel: [DEPLOY.md](DEPLOY.md)) y
+**cerrar la calidad del contenido** antes de abrirla al público.
 
 ---
 
@@ -96,6 +96,11 @@ apagado; para el público hay que agregar la ruta.
 
 ## Roadmap de producto
 
+- **Herramientas (2026-08-31).** `/herramientas` con calculadora de
+  prestaciones y calculadora de área, abiertas a cualquier visitante y sin
+  backend: el cálculo vive en `lib/modules/herramientas/*` y las páginas lo
+  dibujan. Para agregar una: módulo puro + test, página en
+  `app/herramientas/<slug>/` y alta en `lib/tools.ts` (menú + índice).
 - **Phase 12 — Deploy.** Prueba en Vercel ahora ([DEPLOY.md](DEPLOY.md));
   lanzamiento público cuando cierren los tres puntos de arriba.
 - **Phase 13 — Jurisprudencias.** Scraper (Railway + Playwright) sobre el

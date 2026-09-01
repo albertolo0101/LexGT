@@ -83,6 +83,7 @@ export default function ReaderSurface({
   const [casesLoading, setCasesLoading] = useState(false);
   const [paywallOpen, setPaywallOpen] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [savedCaseTitle, setSavedCaseTitle] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const router = useRouter();
 
@@ -96,16 +97,29 @@ export default function ReaderSurface({
     setTooltip(null);
     setCasesOpen(false);
     setActionError(null);
+    setSavedCaseTitle(null);
   }, []);
 
+  // El panel de una anotación existente es un formulario: se cierra con
+  // "Guardar nota", "Eliminar", la X o Escape — nunca por un click afuera, que
+  // borraba la nota a medio escribir. El de una selección nueva sí se descarta
+  // al hacer click en otro lado, porque la selección misma se pierde.
   useEffect(() => {
     const dismiss = (e: MouseEvent) => {
       if (tooltipRef.current?.contains(e.target as Node)) return;
+      if (tooltip?.kind === "existing") return;
       closeTooltip();
     };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeTooltip();
+    };
     document.addEventListener("mousedown", dismiss);
-    return () => document.removeEventListener("mousedown", dismiss);
-  }, [closeTooltip]);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", dismiss);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [closeTooltip, tooltip?.kind]);
 
   const handleMouseUp = useCallback(() => {
     if (!isAuthenticated) return;
@@ -152,6 +166,7 @@ export default function ReaderSurface({
       setNoteText(localNotes[annotationId] ?? notesById[annotationId] ?? "");
       setCasesOpen(false);
       setActionError(null);
+      setSavedCaseTitle(null);
       setTooltip({ kind: "existing", x: e.clientX, y: e.clientY - 4, annotationId });
     },
     [isAuthenticated, localNotes, notesById]
@@ -218,25 +233,25 @@ export default function ReaderSurface({
   const handleSaveNote = () => {
     if (!tooltip || tooltip.kind !== "existing") return;
     const { annotationId } = tooltip;
-    const note = noteText || null;
-    setTooltip(null);
+    const note = noteText.trim() || null;
     setActionError(null);
     startTransition(async () => {
       const result = await updateAnnotationNote(annotationId, note);
       handleActionResult(result);
-      if (result.ok) {
-        setLocalNotes((prev) => ({ ...prev, [annotationId]: note }));
-        // El panel derecho lista las notas desde el servidor.
-        router.refresh();
-      }
+      if (!result.ok) return;
+      setLocalNotes((prev) => ({ ...prev, [annotationId]: note }));
+      // Cerrar solo con el guardado confirmado: si falla, el texto sigue en
+      // pantalla y se puede reintentar.
+      closeTooltip();
+      // El panel derecho lista las notas desde el servidor.
+      router.refresh();
     });
   };
 
   const handleDelete = () => {
     if (!tooltip || tooltip.kind !== "existing") return;
     const { annotationId } = tooltip;
-    setTooltip(null);
-    setActionError(null);
+    closeTooltip();
     startTransition(async () => {
       const result = await deleteAnnotation(annotationId);
       handleActionResult(result);
@@ -261,15 +276,18 @@ export default function ReaderSurface({
     setCasesOpen((prev) => !prev);
   };
 
-  const handleAddToCase = (caseId: string) => {
+  const handleAddToCase = (caseId: string, caseTitle: string) => {
     if (!tooltip || tooltip.kind !== "existing") return;
     const { annotationId } = tooltip;
     setCasesOpen(false);
-    setTooltip(null);
     setActionError(null);
+    setSavedCaseTitle(null);
     startTransition(async () => {
       const result = await addAnnotationToCase({ caseId, annotationId });
       handleActionResult(result);
+      // El panel se queda abierto: guardar en un caso no termina la edición de
+      // la nota, y cerrarlo aquí era lo que dejaba la nota sin escribir.
+      if (result.ok) setSavedCaseTitle(caseTitle);
     });
   };
 
@@ -314,20 +332,36 @@ export default function ReaderSurface({
                 </button>
               </div>
             ) : (
-              <div className="bg-navy-900 text-white rounded-lg shadow-xl p-2 flex flex-col gap-2 min-w-[180px]">
+              <div className="bg-navy-900 text-white rounded-lg shadow-xl p-2.5 flex flex-col gap-2 w-[260px]">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-navy-100/70">
+                    Anotación
+                  </span>
+                  <button
+                    onClick={closeTooltip}
+                    className="text-navy-100/70 hover:text-white transition-colors p-0.5"
+                    aria-label="Cerrar"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                      <path d="m6 6 12 12M6 18 18 6" />
+                    </svg>
+                  </button>
+                </div>
+
                 {tier === "pro" && (
                   <>
                     <textarea
                       value={noteText}
                       onChange={(e) => setNoteText(e.target.value)}
-                      placeholder="Agregar nota…"
-                      rows={3}
-                      className="w-full text-xs bg-white/10 text-white rounded p-1.5 resize-none placeholder-navy-100/50 focus:outline-none"
+                      placeholder="Escribe tu nota…"
+                      rows={4}
+                      autoFocus
+                      className="w-full text-xs bg-white/10 text-white rounded p-2 resize-y placeholder-navy-100/50 focus:outline-none focus:ring-1 focus:ring-gold-400"
                     />
                     <button
                       onClick={handleSaveNote}
                       disabled={pending}
-                      className="text-xs font-semibold text-navy-900 bg-gold-400 hover:bg-gold-500 disabled:opacity-50 transition-colors rounded-full px-3 py-1"
+                      className="text-xs font-semibold text-navy-900 bg-gold-400 hover:bg-gold-500 disabled:opacity-50 transition-colors rounded-full px-3 py-1.5"
                     >
                       {pending ? "…" : "Guardar nota"}
                     </button>
@@ -335,14 +369,14 @@ export default function ReaderSurface({
                     <button
                       onClick={handleToggleCases}
                       disabled={pending}
-                      className="text-white text-xs px-3 py-1 rounded bg-white/10 hover:bg-white/15 disabled:opacity-50 transition-colors text-left flex items-center justify-between"
+                      className="text-white text-xs px-3 py-1.5 rounded bg-white/10 hover:bg-white/15 disabled:opacity-50 transition-colors text-left flex items-center justify-between"
                     >
                       <span>Guardar en caso</span>
                       <span className="ml-2 opacity-60">{casesOpen ? "▴" : "▾"}</span>
                     </button>
 
                     {casesOpen && (
-                      <div className="bg-white/10 rounded overflow-hidden">
+                      <div className="bg-white/10 rounded overflow-hidden max-h-40 overflow-y-auto">
                         {casesLoading ? (
                           <p className="text-xs text-navy-100/60 px-3 py-2">Cargando…</p>
                         ) : !userCases || userCases.length === 0 ? (
@@ -351,7 +385,7 @@ export default function ReaderSurface({
                           userCases.map((c) => (
                             <button
                               key={c.id}
-                              onClick={() => handleAddToCase(c.id)}
+                              onClick={() => handleAddToCase(c.id, c.title)}
                               className="w-full text-left text-xs text-white px-3 py-2 hover:bg-white/10 transition-colors"
                             >
                               {c.title}
@@ -360,14 +394,18 @@ export default function ReaderSurface({
                         )}
                       </div>
                     )}
+
+                    {savedCaseTitle && (
+                      <p className="text-[11px] text-green-300">Guardado en “{savedCaseTitle}”.</p>
+                    )}
                   </>
                 )}
                 <button
                   onClick={handleDelete}
                   disabled={pending}
-                  className="text-white text-xs px-3 py-1 rounded hover:bg-red-600 disabled:opacity-50 transition-colors"
+                  className="text-white text-xs px-3 py-1.5 rounded bg-white/5 hover:bg-red-600 disabled:opacity-50 transition-colors"
                 >
-                  {pending ? "…" : "Eliminar"}
+                  {pending ? "…" : "Eliminar resaltado"}
                 </button>
                 {actionError && <p className="text-xs text-red-300">{actionError}</p>}
               </div>

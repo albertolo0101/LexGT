@@ -9,6 +9,7 @@ import ArticleBlock from "./ArticleBlock";
 import DocHeader from "./DocHeader";
 import LawToc from "./LawToc";
 import NotifBanner from "./NotifBanner";
+import RevisionLed from "./RevisionLed";
 import RightPanel from "./RightPanel";
 
 type Props = { params: Promise<{ slug: string }> };
@@ -61,6 +62,11 @@ export default async function LawReadingPage({ params }: Props) {
             notesById={notesById}
             className="doc-sheet"
           >
+            <RevisionLed
+              revisedAt={reforms[0]?.published_at ?? law.created_at}
+              hasReforms={reforms.length > 0}
+            />
+
             <NotifBanner lawSlug={slug} show={actor.tier === "pro" && hasUnseenReform} />
 
             <DocHeader law={law} latestReform={reforms[0] ?? null} articleCount={articleCount} />

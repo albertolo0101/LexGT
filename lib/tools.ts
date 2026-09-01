@@ -1,0 +1,24 @@
+// Catálogo de herramientas. Una sola fuente para el menú de la barra superior
+// (`components/ToolsMenu.tsx`) y el índice `/herramientas`.
+export type ToolEntry = {
+  slug: string
+  name: string
+  description: string
+  /** Nombre de un icono de `components/icons.tsx`. */
+  icon: 'gavel' | 'layers'
+}
+
+export const TOOLS: ToolEntry[] = [
+  {
+    slug: 'prestaciones',
+    name: 'Calculadora de prestaciones',
+    description: 'Indemnización, aguinaldo, bono 14 y vacaciones por tiempo servido.',
+    icon: 'gavel',
+  },
+  {
+    slug: 'area',
+    name: 'Calculadora de área',
+    description: 'Área de un polígono por coordenadas o por rumbos y distancias.',
+    icon: 'layers',
+  },
+]

@@ -35,20 +35,28 @@ export default function RightPanel({
   orphanedAnnotations: OrphanedAnnotation[]
   reforms: LawReform[]
 }) {
-  // Colapsado por defecto: la hoja de lectura es la prioridad de la pantalla.
-  const [open, setOpen] = useState(false)
-  const [tab, setTab] = useState<Tab>(notes.length > 0 || orphanedAnnotations.length > 0 ? 'notas' : 'historial')
+  // Abierto por defecto: las herramientas de trabajo (notas, caso,
+  // concordancias) deben estar a la vista al entrar; quien quiera solo leer lo
+  // cierra con la X.
+  const [open, setOpen] = useState(true)
+  const [tab, setTab] = useState<Tab>('notas')
   const [paywallOpen, setPaywallOpen] = useState(false)
 
   if (!open) {
     return (
-      <button
-        onClick={() => setOpen(true)}
-        className="hidden xl:flex w-10 flex-shrink-0 items-start justify-center pt-1 text-ink-400 hover:text-navy-700 transition-colors"
-        aria-label="Mostrar panel"
-      >
-        <Ico.note className="w-4 h-4" />
-      </button>
+      <div className="hidden xl:flex w-12 flex-shrink-0 justify-center">
+        <button
+          onClick={() => setOpen(true)}
+          title="Mostrar herramientas"
+          className="sticky top-6 flex h-auto flex-col items-center gap-2 rounded-xl border border-gold-400/70 bg-white px-2 py-3 text-navy-800 shadow-sm transition-colors hover:border-gold-500 hover:bg-gold-50"
+          aria-label="Mostrar herramientas"
+        >
+          <Ico.note className="w-5 h-5 text-gold-700" />
+          <span className="text-[10px] font-semibold uppercase tracking-widest [writing-mode:vertical-rl]">
+            Herramientas
+          </span>
+        </button>
+      </div>
     )
   }
 
@@ -143,7 +151,7 @@ export default function RightPanel({
               )
             ) : (
               <div className="text-center py-4">
-                <p className="text-sm text-ink-500 mb-3">Las notas son una función de LexGT Pro.</p>
+                <p className="text-sm text-ink-900 mb-3">Las notas son una función de LexGT Pro.</p>
                 <button
                   onClick={() => setPaywallOpen(true)}
                   className="text-xs font-semibold text-navy-900 bg-gold-400 hover:bg-gold-500 transition-colors rounded-full px-4 py-2"
@@ -156,14 +164,14 @@ export default function RightPanel({
           {tab === 'caso' &&
             (tier === 'pro' ? (
               <div className="text-center py-4">
-                <p className="text-sm text-ink-500 mb-3">Selecciona un caso desde Mis casos para vincular artículos.</p>
-                <Link href="/casos" className="text-xs font-semibold text-navy-700 hover:text-navy-900 transition-colors">
+                <p className="text-sm text-ink-900 mb-3">Guarda un resaltado en un caso desde el texto y aparecerá en tu expediente.</p>
+                <Link href="/casos" className="text-xs font-semibold text-navy-800 hover:text-navy-900 transition-colors">
                   Ir a Mis casos →
                 </Link>
               </div>
             ) : (
               <div className="text-center py-4">
-                <p className="text-sm text-ink-500 mb-3">Los casos son una función de LexGT Pro.</p>
+                <p className="text-sm text-ink-900 mb-3">Los casos son una función de LexGT Pro.</p>
                 <button
                   onClick={() => setPaywallOpen(true)}
                   className="text-xs font-semibold text-navy-900 bg-gold-400 hover:bg-gold-500 transition-colors rounded-full px-4 py-2"

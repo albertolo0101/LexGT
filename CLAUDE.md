@@ -20,8 +20,9 @@ Tres tiers: **anónimo** (lectura + búsqueda, ventana de reformas 7 días),
 
 ## Estado (2026-08-31)
 
-- `npx tsc --noEmit`, `npm run lint`, `npm run test` (70), `npm run build`:
-  verdes. `npm run test:rls` (pgTAP): 15/15 con Docker corriendo.
+- `npx tsc --noEmit`, `npm run lint`, `npm run test` (96), `npm run build`:
+  verdes. `npm run test:e2e`: 5/5 anónimos (2 autenticados en skip).
+  `npm run test:rls` (pgTAP): 15/15 con Docker corriendo.
 - Plan de remediación arquitectónica **Phases 0-7 completo** — seguridad
   cerrada a nivel RLS, capa de servicios, API v1, anclaje de anotaciones v2,
   CI, convención de módulos. Resumen por fase en `docs/ROADMAP.md`.
@@ -116,6 +117,15 @@ Matriz completa en `docs/SECURITY.md`.
     `lib/cache/law-content.ts`; `getLawUserLayer` (highlights, notas,
     reformas) siempre se consulta fresco. Las acciones que cambian texto
     llaman `revalidateTag(LAW_CONTENT_TAG)`.
+15. **El panel de anotación es un formulario, no un tooltip** — se cierra solo
+    con "Guardar nota", "Eliminar", la X o Escape. Un click afuera ya no lo
+    descarta (borraba la nota a medio escribir) y guardar en un caso lo deja
+    abierto con la confirmación. El panel de una selección nueva sí se
+    descarta al hacer click afuera: la selección se pierde igual.
+16. **Las herramientas (`/herramientas/*`) son páginas cliente puras** — sin
+    DB, sin tier, sin API: el cálculo vive en `lib/modules/herramientas/*`
+    (módulos sin `server-only`, con tests de Vitest) y la página solo lo
+    dibuja. Alta en `lib/tools.ts`, que alimenta el menú y el índice.
 
 ---
 
@@ -162,15 +172,29 @@ app/
     [slug]/                      → vista de lectura: la ley COMPLETA en scroll
       page.tsx                    → compone índice + hoja + panel derecho
       LawToc.tsx                  → índice sticky con scroll-spy (cliente)
+      RevisionLed.tsx             → LED verde "texto al día" + fecha de la
+                                    última reforma (o de carga de la ley)
       DocHeader.tsx               → portada del documento
       ArticleBlock.tsx            → artículo (entrada corrida "Artículo N.")
       ParagraphText.tsx           → párrafo anotable, 100% servidor
-      RightPanel.tsx, NotifBanner.tsx, types.ts
+      RightPanel.tsx              → notas/caso/concordancias/historial,
+                                    ABIERTO por defecto (se cierra con la X)
+      NotifBanner.tsx, types.ts
     [slug]/[section_id]/page.tsx → redirect a #seccion-… (enlaces viejos)
   casos/
-    page.tsx, CasesClient.tsx, [id]/page.tsx
-    actions.ts                   → createCase, deleteCase,
+    page.tsx, CasesClient.tsx
+    [id]/page.tsx + CaseDetailClient.tsx → notas del caso (caja de texto
+                                    arriba), nota editable por anotación y
+                                    "Ver en la ley" (#articulo-N)
+    actions.ts                   → createCase, updateCase, deleteCase,
                                     addAnnotationToCase, removeAnnotationFromCase
+  herramientas/                  → herramientas públicas, 100% cliente
+    page.tsx                     → índice
+    ToolHeader.tsx               → migas + título
+    prestaciones/                → indemnización, aguinaldo, bono 14,
+                                    vacaciones por tiempo servido
+    area/                        → área de polígono por coordenadas o por
+                                    rumbos y distancias + unidades agrarias
   auth/actions.ts (signOut), login/page.tsx, register/page.tsx
   admin/
     layout.tsx (guard), page.tsx, TierForm.tsx
@@ -188,6 +212,7 @@ components/
   SearchBar.tsx       → form → /buscar?q=
   ReaderSurface.tsx   → UNA superficie cliente por ley: selección de texto,
                          tooltip de highlight/nota, "guardar en caso"
+  ToolsMenu.tsx       → dropdown "Herramientas" en la barra superior
   LawCard.tsx, ReformModal.tsx, PaywallModal.tsx, icons.tsx
 
 lib/
@@ -204,7 +229,10 @@ lib/
   api/rate-limit.ts   → searchLimiter / apiLimiter (Upstash, fail-open)
   services/           → annotations.ts, cases.ts, reforms.ts, admin.ts (+tests)
   services/queries/   → laws.ts, reading.ts, search.ts, cases.ts (+tests)
+  tools.ts            → catálogo de herramientas (menú + índice)
   modules/calc-laboral/ → schemas.ts, service.ts, README.md (+tests)
+  modules/herramientas/ → prestaciones.ts, area.ts — cálculo puro, sin
+                         `server-only`: lo importan las páginas cliente (+tests)
   test/               → mock-supabase.ts, empty-module.ts
 
 middleware.ts         → refresca la cookie de sesión; protege /admin/*
@@ -247,48 +275,40 @@ hermanas (pendiente).
 
 ---
 
-## Última sesión (2026-08-31)
+## Última sesión (2026-08-31, parte 3)
 
-**Parte 1 — limpieza de repo y documentación** (commit `e68b8e2`): README real,
-CLAUDE.md reescrito contra el estado verificado, `docs/ROADMAP.md` y
-`docs/DEPLOY.md` nuevos, `LAWS.md` → `docs/CONTENT.md`, `SCHEMA_SNAPSHOT.md`
-regenerado desde prod. Borrados `ARCHITECTURE_REVIEW.md`,
-`LEXGT_EXECUTION_PLAN.md`, `.env.local.example` y los SVG de create-next-app.
+**Casos, lector y herramientas.**
 
-**Parte 2 — vista de lectura: la ley completa en una página.**
-
-- `app/leyes/[slug]/` es ahora el lector: documento continuo + índice sticky
-  con scroll-spy + panel derecho (colapsado por defecto). La antigua tabla de
-  contenidos y la ruta por sección desaparecieron;
-  `[slug]/[section_id]` solo redirige a `#seccion-…`.
-- `components/ReaderSurface.tsx` reemplaza a `ParagraphHighlighter`: una sola
-  superficie cliente con delegación de eventos; los párrafos los renderiza el
-  servidor (`ParagraphText`, `segments.ts`). Al guardar/borrar un highlight se
-  parcha el DOM (`saveAnnotation` ahora devuelve el `id`) en vez de
-  re-renderizar la ley; solo las notas fuerzan `router.refresh()`.
-- **Hallazgo crítico:** PostgREST corta en 1,000 filas — el Código Civil
-  (1,996 artículos) salía truncado sin error. Todas las lecturas a escala de
-  ley se paginan con `.range()`.
-- Orden de lectura por `articles.position` (no `sections.position`, que tiene
-  colisiones); los encabezados se emiten al cambiar de rama.
-- Contenido cacheado en `lib/cache/law-content.ts` (`unstable_cache`, tag +
-  versión de clave) con `lib/supabase-public.ts` como cuarta factory.
-  Medido en build de producción: Código Civil 2.3 s frío → 0.75 s cacheado
-  (1.3 MB gzip); Código de Trabajo 0.41 s.
-- **Rate limiting:** las credenciales de Upstash de `.env.local` apuntan a una
-  instancia inexistente y cada búsqueda pagaba ~4.6 s de reintentos antes de
-  hacer fail-open. `lib/api/rate-limit.ts` ahora usa 1 reintento y un techo de
-  400 ms → búsqueda de 4.75 s a ~0.2 s. **Antes de configurar Upstash en
-  Vercel, verificar que la instancia exista.**
-- Catálogo: las tarjetas de la cuadrícula ahora son "libros" (pasta azul,
-  tipografía dorada, lomo); en la lista y en la barra lateral va primero el
-  nombre de la ley y luego el decreto en tono pálido.
-- Verificado: `tsc`, `lint` limpio, 78 unit tests, `build`, 3/3 e2e anónimos
-  contra el build de producción, y que el texto de cada `[data-paragraph-id]`
-  en el DOM coincide byte a byte con `paragraphs.text` (contrato de anclaje).
-- **Sin verificar (requiere sesión):** guardar highlight, nota y "guardar en
-  caso" con un usuario real — los e2e autenticados siguen en `test.skip`
-  hasta que exista la cuenta free de prueba.
+- **Casos:** cada caso abre con una caja de "Notas del caso" (se guarda en
+  `cases.description` vía `updateCase`, acción nueva); cada anotación guardada
+  tiene su nota editable en línea y un botón **Ver en la ley** que salta a
+  `/leyes/<slug>#articulo-<n>` — `getCaseDetail` ahora trae `laws(slug,
+  short_name)` por el join de artículos. `/casos` y `/casos/[id]` dejaron de
+  usar `.from(` directo y pasan por `lib/services/queries/cases.ts`.
+- **Panel de anotación (`ReaderSurface`):** ya no se cierra al hacer click
+  afuera ni al elegir un caso del dropdown; se cierra con "Guardar nota",
+  "Eliminar", la X o Escape, y al reabrir un highlight la nota aparece
+  editable. Guardar en un caso confirma en línea sin cerrar.
+- **Lector:** el panel derecho (Notas/Caso/Concordancias/Historial) abre
+  **abierto** y arranca en Notas; cerrado deja una pestaña dorada vertical
+  "Herramientas", mucho más visible que el icono anterior. Arriba del
+  documento hay un LED verde con la fecha de última reforma o revisión
+  (`RevisionLed`).
+- **Contraste:** los formularios de caso, el pie de la barra lateral y los
+  textos del panel derecho pasaron de gris claro a tinta oscura.
+- **Herramientas:** dropdown nuevo en la barra superior, junto al buscador, e
+  índice en `/herramientas`. Dos calculadoras, ambas 100% en el navegador:
+  **prestaciones** (indemnización Art. 82, aguinaldo, bono 14, vacaciones y
+  vacaciones no gozadas, convención 30/360) y **área** (polígono por
+  coordenadas o por rumbos y distancias, con error de cierre, dibujo del
+  polígono y conversión a varas², hectáreas, manzanas y caballerías —
+  vara = 0.835905 m).
+- Verificado: `tsc`, `lint`, 96 unit tests, `build`, y contra el build de
+  producción 5/5 e2e anónimos (dos nuevos cubren el menú de herramientas y la
+  calculadora de área).
+- **Sin verificar (requiere sesión Pro):** notas del caso, edición de notas
+  desde el caso y el panel de anotación con un usuario real — sigue faltando
+  la cuenta de prueba.
 
 Siguiente sesión: ejecutar `docs/DEPLOY.md` (deploy a Vercel) y, después, la
 recarga por ley del contenido desde `lex-extractor`.

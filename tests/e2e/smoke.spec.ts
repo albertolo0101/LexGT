@@ -38,6 +38,42 @@ test("cmd+k search navigates to an article anchor", async ({ page }) => {
   await expect(page).toHaveURL(/\/leyes\/[^/#]+#articulo-/);
 });
 
+test.describe("herramientas", () => {
+  test("el menú de la barra superior lleva a la calculadora de prestaciones", async ({ page }) => {
+    await page.goto("/leyes");
+
+    await page.getByRole("button", { name: "Herramientas" }).click();
+    await page.getByRole("menuitem", { name: /Calculadora de prestaciones/ }).click();
+    await expect(page).toHaveURL("/herramientas/prestaciones");
+
+    await page.locator("#salario").fill("4000");
+    await page.locator("#anios").fill("3");
+    await page.locator("#meses").fill("6");
+
+    // 3.5 años × Q4,000 de indemnización + aguinaldo + bono 14 + vacaciones.
+    await expect(page.getByText("Q 24,000.00")).toBeVisible();
+  });
+
+  test("la calculadora de área resuelve un polígono por coordenadas", async ({ page }) => {
+    await page.goto("/herramientas/area");
+
+    const vertices = [
+      [0, 0],
+      [40, 0],
+      [40, 30],
+      [0, 30],
+    ];
+    for (const [i, [x, y]] of vertices.entries()) {
+      if (i >= 3) await page.getByRole("button", { name: "Agregar vértice" }).click();
+      await page.getByLabel(`X del vértice ${i + 1}`).fill(String(x));
+      await page.getByLabel(`Y del vértice ${i + 1}`).fill(String(y));
+    }
+
+    await expect(page.getByText("1,200.00 m²")).toBeVisible();
+    await expect(page.getByText("140.00 m")).toBeVisible();
+  });
+});
+
 const FREE_EMAIL = process.env.PLAYWRIGHT_FREE_USER_EMAIL;
 const FREE_PASSWORD = process.env.PLAYWRIGHT_FREE_USER_PASSWORD;
 

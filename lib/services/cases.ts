@@ -34,6 +34,39 @@ export async function createCase(
   return newCase as Case;
 }
 
+export const UpdateCaseInput = z.object({
+  caseId: z.string(),
+  title: z.string().min(1).optional(),
+  /** Notas del caso: la caja de texto de la cabecera del detalle. */
+  description: z.string().nullable().optional(),
+  color: z.string().optional(),
+});
+export type UpdateCaseInput = z.infer<typeof UpdateCaseInput>;
+
+export async function updateCase(
+  db: SupabaseClient,
+  actor: Actor,
+  input: UpdateCaseInput
+): Promise<Case> {
+  requirePro(actor);
+
+  const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (input.title !== undefined) patch.title = input.title;
+  if (input.description !== undefined) patch.description = input.description;
+  if (input.color !== undefined) patch.color = input.color;
+
+  const { data, error } = await db
+    .from("cases")
+    .update(patch)
+    .eq("id", input.caseId)
+    .eq("user_id", actor.userId)
+    .select("*")
+    .single();
+  if (error) throw error;
+
+  return data as Case;
+}
+
 export const DeleteCaseInput = z.object({
   caseId: z.string(),
 });

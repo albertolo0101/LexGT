@@ -82,7 +82,11 @@ describe("getCaseDetail", () => {
                 char_start: 0,
                 char_end: 5,
                 paragraphs: { text: "Hola mundo" },
-                articles: { number: "1", heading: "Disposiciones generales" },
+                articles: {
+                  number: "1",
+                  heading: "Disposiciones generales",
+                  laws: { slug: "codigo-civil", short_name: "Código Civil" },
+                },
               },
             },
             {
@@ -114,6 +118,7 @@ describe("getCaseDetail", () => {
         note: null,
         excerpt: "Hola ",
         article: { number: "1", heading: "Disposiciones generales" },
+        law: { slug: "codigo-civil", short_name: "Código Civil" },
       },
       {
         id: "ca-2",
@@ -122,6 +127,7 @@ describe("getCaseDetail", () => {
         note: "migrado",
         excerpt: null,
         article: null,
+        law: null,
       },
     ]);
   });
